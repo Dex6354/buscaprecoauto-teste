@@ -4,12 +4,14 @@ import unicodedata
 import re
 import json
 import os
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 # --- Constantes ---
 
 # Link do logo Nagumo e imagem padrão
 LOGO_NAGUMO_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-nagumo2.png"
+LOGO_SHIBATA_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-shibata.png" # Nova constante
+
 DEFAULT_IMAGE_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/sem-imagem.png"
 
 # Configurações da API Nagumo
@@ -58,6 +60,7 @@ def criar_json_padrao():
         st.info(f"Arquivo '{JSON_FILE}' não encontrado. Criando um arquivo de exemplo com as novas URLs...")
         # Nova estrutura de dados baseada na sua solicitação
         default_data = [
+            # Preço R$6 e R$7 no nome são usados para o mock do Shibata
             { "nome": "🍌 Banana Nanica R$6", "nagumo": "https://www.nagumo.com/p/banana-nanica-kg-2004", "shibata": "https://www.loja.shibata.com.br/produto/16286/banana-nanica-14kg-aprox-6-unidades" },
             { "nome": "🍌 Banana Prata R$7", "nagumo": "https://www.nagumo.com/p/banana-prata-kg-2011", "shibata": "https://www.loja.shibata.com.br/produto/16465/banana-prata-11kg-aprox-8-unidades" }
         ]
@@ -72,52 +75,29 @@ def criar_json_padrao():
 def ler_itens_json():
     """Lê o arquivo itens.json e retorna a lista de itens."""
     if not os.path.exists(JSON_FILE):
+        # Tenta criar o padrão se não existir.
         return criar_json_padrao()
     
     try:
         with open(JSON_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
+            if not data:
+                 st.warning(f"O arquivo '{JSON_FILE}' está vazio. Tentando criar padrão...")
+                 return criar_json_padrao()
             return data
     except json.JSONDecodeError:
-        st.error(f"Erro: O arquivo '{JSON_FILE}' contém um JSON inválido.")
+        # Captura o erro que você mencionou
+        st.error(f"Erro: O arquivo '{JSON_FILE}' contém um JSON inválido. Verifique a formatação.")
+        # Opcional: tentar criar/sobrescrever com o padrão aqui se desejar recuperar
         return []
     except IOError as e:
         st.error(f"Erro ao ler o arquivo {JSON_FILE}: {e}")
         return []
 
 # --- Funções Utilitárias ---
+# (As funções remover_acentos, contem_papel_toalha, extrair_info_papel_toalha, e calcular_preco_unitario_nagumo foram omitidas por serem longas e não alteradas, mas estão no código final abaixo)
 
-def extrair_sku_da_url_nagumo(url_nagumo: str):
-    """
-    Extrai o SKU do final de uma URL do Nagumo no formato '.../p/nome-do-produto-sku'.
-    Ex: 'https://www.nagumo.com/p/banana-nanica-kg-2004' -> '2004'
-    """
-    if not url_nagumo or not isinstance(url_nagumo, str):
-        return None
-    
-    try:
-        # Analisa a URL para obter o caminho
-        path = urlparse(url_nagumo).path
-        
-        # O SKU é o último segmento do caminho
-        # Ex: /p/banana-nanica-kg-2004 -> ['p', 'banana-nanica-kg-2004']
-        path_segments = [seg for seg in path.split('/') if seg]
-        
-        if path_segments:
-            # O último segmento é 'nome-do-produto-sku'
-            last_segment = path_segments[-1]
-            
-            # O SKU é a parte final após o último hífen
-            match = re.search(r'-(\d+)$', last_segment)
-            if match:
-                return match.group(1)
-                
-    except Exception as e:
-        # st.warning(f"Não foi possível extrair o SKU da URL {url_nagumo}: {e}")
-        return None
-        
-    return None
-
+# --- Funções Utilitárias (Mantidas do código anterior) ---
 
 def remover_acentos(texto):
     if not texto:
@@ -239,7 +219,31 @@ def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=Non
 
     return preco_unitario
 
-# --- FUNÇÃO DE BUSCA AJUSTADA PARA USAR URL ---
+def extrair_sku_da_url_nagumo(url_nagumo: str):
+    """
+    Extrai o SKU do final de uma URL do Nagumo no formato '.../p/nome-do-produto-sku'.
+    Ex: 'https://www.nagumo.com/p/banana-nanica-kg-2004' -> '2004'
+    """
+    if not url_nagumo or not isinstance(url_nagumo, str):
+        return None
+    
+    try:
+        path = urlparse(url_nagumo).path
+        path_segments = [seg for seg in path.split('/') if seg]
+        
+        if path_segments:
+            last_segment = path_segments[-1]
+            
+            match = re.search(r'-(\d+)$', last_segment)
+            if match:
+                return match.group(1)
+                
+    except Exception as e:
+        return None
+        
+    return None
+
+# --- FUNÇÃO DE BUSCA NAGUMO (Ajustada) ---
 
 def buscar_produto_nagumo_pela_url(url_nagumo: str):
     """
@@ -251,7 +255,6 @@ def buscar_produto_nagumo_pela_url(url_nagumo: str):
         st.error(f"Não foi possível extrair o SKU da URL do Nagumo: {url_nagumo}")
         return None
         
-    # Lógica de busca por SKU (o mesmo da função original, mas com novo nome)
     payload = {
         "operationName": "SearchProducts",
         "variables": {
@@ -259,9 +262,9 @@ def buscar_produto_nagumo_pela_url(url_nagumo: str):
                 "clientId": "NAGUMO",
                 "storeReference": "22",
                 "currentPage": 1,
-                "minScore": 0.1,  # Score baixo, pois o SKU deve ser exato
-                "pageSize": 10,   # Buscar poucos, já que o SKU deve ser (quase) único
-                "search": [{"query": str(sku)}], # O SKU é usado como termo de busca
+                "minScore": 0.1,  
+                "pageSize": 10,   
+                "search": [{"query": str(sku)}],
                 "filters": {},
                 "googleAnalyticsSessionId": ""
             }
@@ -270,21 +273,18 @@ def buscar_produto_nagumo_pela_url(url_nagumo: str):
     }
     try:
         response = requests.post(NAGUMO_API_URL, headers=NAGUMO_HEADERS, json=payload, timeout=10)
-        response.raise_for_status() # Lança erro para status HTTP ruins (como 400 ou 500)
+        response.raise_for_status() 
         data = response.json()
         produtos = data.get("data", {}).get("searchProducts", {}).get("products", [])
         
-        # Filtra a lista para achar o SKU exato.
         for produto in produtos:
             if produto.get('sku') == str(sku):
-                return produto # Encontramos o produto exato
+                return produto
         
-        # Fallback: Se não encontrou o SKU exato, mas a busca retornou algo, 
         if produtos:
-            # st.warning(f"SKU {sku} não encontrado com exatidão, retornando o mais próximo: {produtos[0]['sku']}")
             return produtos[0]
             
-        return None # Nenhum produto encontrado
+        return None
         
     except requests.exceptions.RequestException as e:
         st.error(f"Erro de conexão com Nagumo ao buscar URL {url_nagumo} (SKU {sku}): {e}")
@@ -293,18 +293,44 @@ def buscar_produto_nagumo_pela_url(url_nagumo: str):
         st.error(f"Ocorreu um erro ao processar a resposta do Nagumo (URL {url_nagumo}, SKU {sku}): {e}")
         return None
 
+# --- NOVO MOCK PARA SHIBATA ---
+
+def buscar_produto_shibata_mock(nome_item: str):
+    """
+    Simula a busca do Shibata, extraindo o preço do nome do item no JSON.
+    NOTA: Isso é um MOCK (simulação). A integração real precisa da API do Shibata.
+    """
+    match = re.search(r'R\$(\d+[.,]?\d*)', nome_item)
+    if match:
+        preco_str = match.group(1).replace(',', '.')
+        try:
+            # Retorna um preço (Float) e uma descrição simulada
+            return {
+                "preco": float(preco_str),
+                "descricao": "Preço simulado do nome (R$/kg)",
+                "unidade": "kg"
+            }
+        except ValueError:
+            pass
+    
+    # Preço padrão/fallback se não encontrar no nome
+    return {
+        "preco": None,
+        "descricao": "N/D (API indisponível/Preço não encontrado no nome)"
+    }
+
 # --- Configuração da Página Streamlit ---
 
-st.set_page_config(page_title="Preços Nagumo", page_icon="🛒", layout="wide")
+st.set_page_config(page_title="Preços Nagumo vs Shibata", page_icon="🛒", layout="wide")
 
-# CSS para customizar a aparência (baseado no script original)
+# CSS para customizar a aparência
 st.markdown("""
     <style>
+        /* CSS Geral */
         .block-container { 
             padding-top: 0rem; 
             padding-bottom: 15px !important;
             margin-bottom: 15px !important;
-            /* Remove o padding lateral excessivo para layout de coluna única */
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
         }
@@ -312,87 +338,113 @@ st.markdown("""
         #MainMenu {visibility: hidden;}
         header[data-testid="stHeader"] { display: none; }
 
-        /* Estilos do Bloco de Produto (copiado do original) */
+        /* Estilos do Bloco de Produto */
         div, span, strong, small { font-size: 0.75rem !important; }
-        img { max-width: 100px; height: auto; }
+        img { max-width: 80px; height: auto; }
         hr.product-separator {
             border: none;
             border-top: 1px solid #eee;
             margin: 10px 0;
         }
-        .info-cinza {
-            color: gray;
-            font-size: 0.8rem;
+        .info-cinza { color: gray; font-size: 0.8rem; }
+        
+        /* Layout de Preços */
+        .price-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px; /* Espaço entre Nagumo e Shibata */
+            margin-top: 5px;
+        }
+        .price-box {
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 0.8rem !important;
+        }
+        .market-logo {
+            width: 40px; /* Reduz o tamanho do logo do mercado */
+            height: auto;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .market-header {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .price-value {
+            font-weight: bold;
+            font-size: 1rem;
+            color: #1e8449; /* Verde para destaque */
         }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Interface Principal ---
 
-# Cabeçalho com Logo
+# Cabeçalho com Logos
 st.markdown(f"""
     <h5 style="display: flex; align-items: center; justify-content: center; margin-top: 1rem;">
-        <img src="{LOGO_NAGUMO_URL}" width="120" alt="Nagumo" style="margin-right:8px; border-radius: 6px; border: 1.5px solid white; padding: 0px;"/>
+        <img src="{LOGO_NAGUMO_URL}" width="120" alt="Nagumo" style="margin-right:15px; border-radius: 6px; border: 1.5px solid white; padding: 0px;"/>
+        <img src="{LOGO_SHIBATA_URL}" width="120" alt="Shibata" style="border-radius: 6px; border: 1.5px solid white; padding: 0px;"/>
     </h5>
-    <h6 style='text-align: center;'>🛒 Preços Nagumo</h6>
+    <h6 style='text-align: center;'>🛒 Comparação de Preços</h6>
 """, unsafe_allow_html=True)
 
 # Carrega os itens do JSON
 itens_para_buscar = ler_itens_json()
 
 if not itens_para_buscar:
-    st.warning(f"Nenhum item encontrado em '{JSON_FILE}'. Por favor, crie o arquivo ou adicione itens a ele.")
+    st.error("❌ Não foi possível carregar os itens. Verifique o arquivo 'itens.json'.")
 else:
     st.markdown(f"<small style='text-align: center; display: block;'>🔎 Consultando {len(itens_para_buscar)} item(ns)...</small>", unsafe_allow_html=True)
     st.markdown("---")
 
-    with st.spinner("Buscando preços no Nagumo..."):
+    with st.spinner("Buscando preços..."):
         for item in itens_para_buscar:
             url_nagumo = item.get("nagumo")
-            nome_json = item.get("nome", "Item sem nome") # Nome do item no seu JSON, para referência
+            nome_json = item.get("nome", "Item sem nome")
+            
+            # 1. Busca Nagumo
+            p_nagumo = None
+            if url_nagumo:
+                p_nagumo = buscar_produto_nagumo_pela_url(url_nagumo)
 
-            if not url_nagumo:
-                st.warning(f"Item '{nome_json}' não possui 'nagumo' (URL) no arquivo JSON. Pulando.")
-                continue
+            # 2. Busca/Mock Shibata
+            p_shibata = buscar_produto_shibata_mock(nome_json)
 
-            # Busca o produto na API pela URL (usando a função ajustada)
-            p = buscar_produto_nagumo_pela_url(url_nagumo)
-
-            if not p:
-                st.warning(f"Produto não encontrado para URL: {url_nagumo} ({nome_json})")
+            # Se nenhum dado do Nagumo for encontrado, exibe um aviso e pula a renderização detalhada
+            if not p_nagumo:
+                st.warning(f"Produto Nagumo não encontrado para: {nome_json}")
                 st.markdown("<hr class='product-separator' />", unsafe_allow_html=True)
                 continue
 
-            # --- Processamento dos dados (mantido do script original) ---
-            
-            # Imagem
-            photos_list = p.get('photosUrl')
+            # --- Processamento dos dados Nagumo (mantido) ---
+            photos_list = p_nagumo.get('photosUrl')
             imagem = photos_list[0] if photos_list else DEFAULT_IMAGE_URL
-
-            # Preço
-            preco_normal = p.get("price", 0)
-            promocao = p.get("promotion") or {}
+            
+            # Preço Nagumo
+            preco_normal_nagumo = p_nagumo.get("price", 0)
+            promocao = p_nagumo.get("promotion") or {}
             cond = promocao.get("conditions") or []
-            preco_desconto = None
-            
+            preco_desconto_nagumo = None
             if promocao.get("isActive") and isinstance(cond, list) and len(cond) > 0:
-                preco_desconto = cond[0].get("price")
+                preco_desconto_nagumo = cond[0].get("price")
+            preco_exibir_nagumo = preco_desconto_nagumo if preco_desconto_nagumo else preco_normal_nagumo
             
-            preco_exibir = preco_desconto if preco_desconto else preco_normal
-            
-            # Preço Unitário
-            preco_unitario_str = calcular_preco_unitario_nagumo(
-                preco_exibir, 
-                p.get('description', ''), 
-                p.get('name', ''), 
-                p.get("unit")
+            preco_unitario_nagumo_str = calcular_preco_unitario_nagumo(
+                preco_exibir_nagumo, 
+                p_nagumo.get('description', ''), 
+                p_nagumo.get('name', ''), 
+                p_nagumo.get("unit")
             )
 
             # Título (com destaques para papel)
-            titulo = p['name']
-            texto_completo = p['name'] + " " + p.get('description', '')
+            titulo = p_nagumo['name']
+            texto_completo = p_nagumo['name'] + " " + p_nagumo.get('description', '')
+            # Lógica de destaque de papel (omitida aqui por brevidade, mas mantida no final)
             if contem_papel_toalha(texto_completo):
-                rolos, folhas_por_rolo, total_folhas, texto_exibicao = extrair_info_papel_toalha(p['name'], p['description'])
+                rolos, folhas_por_rolo, total_folhas, texto_exibicao = extrair_info_papel_toalha(p_nagumo['name'], p_nagumo['description'])
                 if texto_exibicao:
                     titulo += f" <span class='info-cinza'>({texto_exibicao})</span>"
             if "papel higi" in remover_acentos(titulo.lower()):
@@ -402,33 +454,64 @@ else:
                 if "folha dupla" in titulo_lower or "folha tripla" in titulo_lower:
                     titulo = re.sub(r"(folha dupla|folha tripla)", r"<span style='color:green; font-weight:bold;'>\1</span>", titulo, flags=re.IGNORECASE)
 
-            # HTML do Preço
-            if preco_desconto and preco_desconto < preco_normal:
-                desconto_percentual = ((preco_normal - preco_desconto) / preco_normal) * 100
-                preco_html = f"""
-                    <span style='font-weight: bold; font-size: 1rem;'>R$ {preco_desconto:.2f}</span><br>
-                    <span style='color: red; font-weight: bold;'> ({desconto_percentual:.0f}% OFF)</span><br>
-                    <span style='text-decoration: line-through; color: gray;'>R$ {preco_normal:.2f}</span>
+
+            # HTML do Preço Nagumo
+            if preco_desconto_nagumo and preco_desconto_nagumo < preco_normal_nagumo:
+                desconto_percentual = ((preco_normal_nagumo - preco_desconto_nagumo) / preco_normal_nagumo) * 100
+                preco_nagumo_html = f"""
+                    <span class='price-value'>R$ {preco_desconto_nagumo:.2f}</span>
+                    <span style='color: red; font-weight: bold; font-size:0.8em;'> ({desconto_percentual:.0f}% OFF)</span><br>
+                    <span style='text-decoration: line-through; color: gray; font-size:0.8em;'>R$ {preco_normal_nagumo:.2f}</span>
                 """
             else:
-                preco_html = f"<span style='font-weight: bold; font-size: 1rem;'>R$ {preco_normal:.2f}</span>"
-            
-            # Estoque
-            estoque = p.get('stock', 'N/D')
+                preco_nagumo_html = f"<span class='price-value'>R$ {preco_normal_nagumo:.2f}</span>"
 
-            # --- Renderização do Produto (HTML copiado do original) ---
-            st.markdown(f"""
-                <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 0rem; flex-wrap: wrap;">
-                    <div style="flex: 0 0 auto;">
-                        <img src="{imagem}" width="80" style="background-color: white; border-top-left-radius: 6px; border-top-right-radius: 6px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; display: block;"/>
-                        <img src="{LOGO_NAGUMO_URL}" width="80" style="border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; border: 1.5px solid white; padding: 0px; display: block;"/>
+            # HTML do Preço Shibata (MOCK)
+            if p_shibata["preco"]:
+                 # Formatação simples para o preço mock
+                 preco_shibata_html = f"<span class='price-value'>R$ {p_shibata['preco']:.2f}</span>"
+            else:
+                 preco_shibata_html = f"<span style='color:red;'>{p_shibata['descricao']}</span>"
+
+
+            # --- Renderização com Colunas ---
+            # Cria duas colunas: uma para a imagem/título, outra para os preços
+            col1, col2 = st.columns([1, 1.5]) 
+            
+            with col1:
+                # Layout de Imagem e Estoque
+                st.markdown(f"""
+                    <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 0rem;">
+                        <div style="flex: 0 0 auto;">
+                            <img src="{imagem}" width="80" style="background-color: white; border-radius: 6px; display: block;"/>
+                        </div>
+                        <div style="flex: 1; word-break: break-word; overflow-wrap: anywhere;">
+                            <strong>{titulo}</strong><br>
+                            <div style="color: gray; font-size: 0.8em;">Estoque: {p_nagumo.get('stock', 'N/D')}</div>
+                            <div style="margin-top: 4px; font-size: 0.9em; color: #666;">{preco_unitario_nagumo_str} (Nagumo Ref.)</div>
+                        </div>
                     </div>
-                    <div style="flex: 1; word-break: break-word; overflow-wrap: anywhere;">
-                        <strong>{titulo}</strong><br>
-                        <strong>{preco_html}</strong><br>
-                        <div style="margin-top: 4px; font-size: 0.9em; color: #666;">{preco_unitario_str}</div>
-                        <div style="color: gray; font-size: 0.8em;">Estoque: {estoque}</div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                # Layout de Preços Nagumo vs Shibata
+                st.markdown(f"""
+                    <div class="price-container">
+                        <div class="price-box" style="border-color: #581845;">
+                            <div class="market-header">
+                                <img src="{LOGO_NAGUMO_URL}" class="market-logo" alt="Nagumo Logo"> Nagumo
+                            </div>
+                            {preco_nagumo_html}
+                        </div>
+                        
+                        <div class="price-box" style="border-color: #ffc300;">
+                            <div class="market-header">
+                                <img src="{LOGO_SHIBATA_URL}" class="market-logo" alt="Shibata Logo"> Shibata
+                            </div>
+                            {preco_shibata_html}
+                            <small style='color:red;'> (Preço MOCK/Simulado do nome)</small>
+                        </div>
                     </div>
-                </div>
-                <hr class='product-separator' />
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<hr class='product-separator' />", unsafe_allow_html=True)

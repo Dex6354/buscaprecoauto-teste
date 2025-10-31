@@ -4,6 +4,7 @@ import unicodedata
 import re
 import json
 import os
+from urllib.parse import urlparse, urlunparse
 
 # --- Constantes ---
 
@@ -52,14 +53,13 @@ JSON_FILE = "itens.json"
 # --- Funções de Leitura/Criação do JSON ---
 
 def criar_json_padrao():
-    """Cria o arquivo itens.json padrão se ele não existir."""
+    """Cria o arquivo itens.json padrão com a nova estrutura, se ele não existir."""
     if not os.path.exists(JSON_FILE):
-        st.info(f"Arquivo '{JSON_FILE}' não encontrado. Criando um arquivo de exemplo...")
+        st.info(f"Arquivo '{JSON_FILE}' não encontrado. Criando um arquivo de exemplo com as novas URLs...")
+        # Nova estrutura de dados baseada na sua solicitação
         default_data = [
-            { "nome": "🍌 Banana Nanica", "sku": "2004" },
-            { "nome": "🍌 Banana Prata", "sku": "2011" },
-            { "nome": "🍎 Maçã Gala", "sku": "2023" },
-            { "nome": "🧻 Papel Higiênico Neve", "sku": "117215" }
+            { "nome": "🍌 Banana Nanica R$6", "nagumo": "https://www.nagumo.com/p/banana-nanica-kg-2004", "shibata": "https://www.loja.shibata.com.br/produto/16286/banana-nanica-14kg-aprox-6-unidades" },
+            { "nome": "🍌 Banana Prata R$7", "nagumo": "https://www.nagumo.com/p/banana-prata-kg-2011", "shibata": "https://www.loja.shibata.com.br/produto/16465/banana-prata-11kg-aprox-8-unidades" }
         ]
         try:
             with open(JSON_FILE, 'w', encoding='utf-8') as f:
@@ -85,7 +85,39 @@ def ler_itens_json():
         st.error(f"Erro ao ler o arquivo {JSON_FILE}: {e}")
         return []
 
-# --- Funções Utilitárias (Copiadas do script original) ---
+# --- Funções Utilitárias ---
+
+def extrair_sku_da_url_nagumo(url_nagumo: str):
+    """
+    Extrai o SKU do final de uma URL do Nagumo no formato '.../p/nome-do-produto-sku'.
+    Ex: 'https://www.nagumo.com/p/banana-nanica-kg-2004' -> '2004'
+    """
+    if not url_nagumo or not isinstance(url_nagumo, str):
+        return None
+    
+    try:
+        # Analisa a URL para obter o caminho
+        path = urlparse(url_nagumo).path
+        
+        # O SKU é o último segmento do caminho
+        # Ex: /p/banana-nanica-kg-2004 -> ['p', 'banana-nanica-kg-2004']
+        path_segments = [seg for seg in path.split('/') if seg]
+        
+        if path_segments:
+            # O último segmento é 'nome-do-produto-sku'
+            last_segment = path_segments[-1]
+            
+            # O SKU é a parte final após o último hífen
+            match = re.search(r'-(\d+)$', last_segment)
+            if match:
+                return match.group(1)
+                
+    except Exception as e:
+        # st.warning(f"Não foi possível extrair o SKU da URL {url_nagumo}: {e}")
+        return None
+        
+    return None
+
 
 def remover_acentos(texto):
     if not texto:
@@ -207,16 +239,19 @@ def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=Non
 
     return preco_unitario
 
-# --- *** FUNÇÃO CORRIGIDA *** ---
+# --- FUNÇÃO DE BUSCA AJUSTADA PARA USAR URL ---
 
-def buscar_produto_nagumo_por_sku(sku: str):
+def buscar_produto_nagumo_pela_url(url_nagumo: str):
     """
-    Busca um produto específico no Nagumo usando o SKU.
+    Extrai o SKU da URL do Nagumo e busca o produto na API.
+    """
+    sku = extrair_sku_da_url_nagumo(url_nagumo)
     
-    CORREÇÃO: Usa o SKU como o termo de BUSCA (query), 
-    pois o filtro de SKU estava causando 400 Bad Request.
-    Esta é a lógica usada no main.py original.
-    """
+    if not sku:
+        st.error(f"Não foi possível extrair o SKU da URL do Nagumo: {url_nagumo}")
+        return None
+        
+    # Lógica de busca por SKU (o mesmo da função original, mas com novo nome)
     payload = {
         "operationName": "SearchProducts",
         "variables": {
@@ -226,8 +261,8 @@ def buscar_produto_nagumo_por_sku(sku: str):
                 "currentPage": 1,
                 "minScore": 0.1,  # Score baixo, pois o SKU deve ser exato
                 "pageSize": 10,   # Buscar poucos, já que o SKU deve ser (quase) único
-                "search": [{"query": str(sku)}], # <-- CORREÇÃO: SKU vai aqui
-                "filters": {},                 # <-- CORREÇÃO: Filtro vazio
+                "search": [{"query": str(sku)}], # O SKU é usado como termo de busca
+                "filters": {},
                 "googleAnalyticsSessionId": ""
             }
         },
@@ -239,14 +274,12 @@ def buscar_produto_nagumo_por_sku(sku: str):
         data = response.json()
         produtos = data.get("data", {}).get("searchProducts", {}).get("products", [])
         
-        # A busca por texto "2004" pode retornar "12004" ou outros.
-        # Precisamos filtrar a lista para achar o SKU exato.
+        # Filtra a lista para achar o SKU exato.
         for produto in produtos:
             if produto.get('sku') == str(sku):
                 return produto # Encontramos o produto exato
         
         # Fallback: Se não encontrou o SKU exato, mas a busca retornou algo, 
-        # é provável que o primeiro resultado seja o correto.
         if produtos:
             # st.warning(f"SKU {sku} não encontrado com exatidão, retornando o mais próximo: {produtos[0]['sku']}")
             return produtos[0]
@@ -254,11 +287,10 @@ def buscar_produto_nagumo_por_sku(sku: str):
         return None # Nenhum produto encontrado
         
     except requests.exceptions.RequestException as e:
-        # O erro 400 Client Error será capturado aqui
-        st.error(f"Erro de conexão com Nagumo ao buscar SKU {sku}: {e}")
+        st.error(f"Erro de conexão com Nagumo ao buscar URL {url_nagumo} (SKU {sku}): {e}")
         return None
     except Exception as e:
-        st.error(f"Ocorreu um erro ao processar a resposta do Nagumo (SKU {sku}): {e}")
+        st.error(f"Ocorreu um erro ao processar a resposta do Nagumo (URL {url_nagumo}, SKU {sku}): {e}")
         return None
 
 # --- Configuração da Página Streamlit ---
@@ -316,22 +348,22 @@ else:
 
     with st.spinner("Buscando preços no Nagumo..."):
         for item in itens_para_buscar:
-            sku = item.get("sku")
-            nome_json = item.get("nome", "Item sem nome")
+            url_nagumo = item.get("nagumo")
+            nome_json = item.get("nome", "Item sem nome") # Nome do item no seu JSON, para referência
 
-            if not sku:
-                st.warning(f"Item '{nome_json}' não possui 'sku' no arquivo JSON. Pulando.")
+            if not url_nagumo:
+                st.warning(f"Item '{nome_json}' não possui 'nagumo' (URL) no arquivo JSON. Pulando.")
                 continue
 
-            # Busca o produto na API pelo SKU (usando a função corrigida)
-            p = buscar_produto_nagumo_por_sku(str(sku))
+            # Busca o produto na API pela URL (usando a função ajustada)
+            p = buscar_produto_nagumo_pela_url(url_nagumo)
 
             if not p:
-                st.warning(f"Produto não encontrado para SKU: {sku} ({nome_json})")
+                st.warning(f"Produto não encontrado para URL: {url_nagumo} ({nome_json})")
                 st.markdown("<hr class='product-separator' />", unsafe_allow_html=True)
                 continue
 
-            # --- Processamento dos dados (copiado do script original) ---
+            # --- Processamento dos dados (mantido do script original) ---
             
             # Imagem
             photos_list = p.get('photosUrl')

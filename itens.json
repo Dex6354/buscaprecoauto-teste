@@ -1,4 +1,4 @@
 [
-  { "nome": "🍌 Banana Nanica R$6" },
-  { "nome": "🍌 Banana Prata R$7" }
+  { "nome": "🍌 Banana Nanica R$6", "sku": 2004 },
+  { "nome": "🍌 Banana Prata R$7", "sku": 2011 }
 ]

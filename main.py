@@ -100,50 +100,37 @@ def extrair_info_papel_toalha(nome, descricao):
     texto_nome = remover_acentos(nome.lower())
     texto_desc = remover_acentos(descricao.lower())
 
-    # Prioritize name for unit information
-    # Pattern 1: X Un Y Folhas (e.g., "Papel Toalha Kitchen Com 2Un 60 Folhas")
     match = re.search(r'(\d+)\s*(un|unidades?|rolos?)\s*(\d+)\s*(folhas|toalhas)', texto_nome)
     if match:
         rolos = int(match.group(1))
         folhas_por_rolo = int(match.group(3))
         total_folhas = rolos * folhas_por_rolo
         return rolos, folhas_por_rolo, total_folhas, f"{rolos} {match.group(2)}, {folhas_por_rolo} {match.group(4)}"
-
-    # Pattern 2: X Folhas (e.g., "Papel Toalha 200 Folhas")
     match = re.search(r'(\d+)\s*(folhas|toalhas)', texto_nome)
     if match:
         total_folhas = int(match.group(1))
         return None, None, total_folhas, f"{total_folhas} {match.group(2)}"
-
-    # If not in name, try description with the same priority
-    texto_completo = f"{texto_nome} {texto_desc}" # Combine for broader search if not found in name
-
-    # Pattern 1 (from description): X Un Y Folhas
+    texto_completo = f"{texto_nome} {texto_desc}"
     match = re.search(r'(\d+)\s*(un|unidades?|rolos?)\s*.*?(\d+)\s*(folhas|toalhas)', texto_completo)
     if match:
         rolos = int(match.group(1))
         folhas_por_rolo = int(match.group(3))
         total_folhas = rolos * folhas_por_rolo
         return rolos, folhas_por_rolo, total_folhas, f"{rolos} {match.group(2)}, {folhas_por_rolo} {match.group(4)}"
-
-    # Pattern 2 (from description): X Folhas
     match = re.search(r'(\d+)\s*(folhas|toalhas)', texto_completo)
     if match:
         total_folhas = int(match.group(1))
         return None, None, total_folhas, f"{total_folhas} {match.group(2)}"
-
-    # Pattern 3: X Unidades (general unit, less specific for paper towels)
     m_un = re.search(r"(\d+)\s*(un|unidades?)", texto_completo)
     if m_un:
         total = int(m_un.group(1))
         return None, None, total, f"{total} unidades"
-
     return None, None, None, None
 
 
 def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=None):
     preco_unitario = "Sem unidade"
-    texto_completo = f"{nome} {descricao}".lower() # Combine name and description for unit extraction
+    texto_completo = f"{nome} {descricao}".lower() 
 
     if contem_papel_toalha(texto_completo):
         rolos, folhas_por_rolo, total_folhas, texto_exibicao = extrair_info_papel_toalha(nome, descricao)
@@ -177,7 +164,6 @@ def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=Non
             except:
                 pass
 
-    # General unit extraction (for other products)
     fontes = [descricao.lower(), nome.lower()]
     for fonte in fontes:
         match_g = re.search(r"(\d+[.,]?\d*)\s*(g|gramas?)", fonte)
@@ -221,11 +207,15 @@ def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=Non
 
     return preco_unitario
 
-# --- Nova Função de API (Busca por SKU) ---
+# --- *** FUNÇÃO CORRIGIDA *** ---
 
 def buscar_produto_nagumo_por_sku(sku: str):
     """
     Busca um produto específico no Nagumo usando o SKU.
+    
+    CORREÇÃO: Usa o SKU como o termo de BUSCA (query), 
+    pois o filtro de SKU estava causando 400 Bad Request.
+    Esta é a lógica usada no main.py original.
     """
     payload = {
         "operationName": "SearchProducts",
@@ -234,10 +224,10 @@ def buscar_produto_nagumo_por_sku(sku: str):
                 "clientId": "NAGUMO",
                 "storeReference": "22",
                 "currentPage": 1,
-                "minScore": 0.1,  # Score baixo, pois o filtro é o principal
-                "pageSize": 5,    # Buscar poucos, já que o SKU deve ser único
-                "search": [],     # Não usamos busca por termo
-                "filters": {"sku": [str(sku)]}, # Filtro por SKU
+                "minScore": 0.1,  # Score baixo, pois o SKU deve ser exato
+                "pageSize": 10,   # Buscar poucos, já que o SKU deve ser (quase) único
+                "search": [{"query": str(sku)}], # <-- CORREÇÃO: SKU vai aqui
+                "filters": {},                 # <-- CORREÇÃO: Filtro vazio
                 "googleAnalyticsSessionId": ""
             }
         },
@@ -245,22 +235,26 @@ def buscar_produto_nagumo_por_sku(sku: str):
     }
     try:
         response = requests.post(NAGUMO_API_URL, headers=NAGUMO_HEADERS, json=payload, timeout=10)
-        response.raise_for_status() # Lança erro para status HTTP ruins
+        response.raise_for_status() # Lança erro para status HTTP ruins (como 400 ou 500)
         data = response.json()
         produtos = data.get("data", {}).get("searchProducts", {}).get("products", [])
         
-        # Garante que estamos pegando o SKU exato
+        # A busca por texto "2004" pode retornar "12004" ou outros.
+        # Precisamos filtrar a lista para achar o SKU exato.
         for produto in produtos:
             if produto.get('sku') == str(sku):
-                return produto
+                return produto # Encontramos o produto exato
         
-        # Fallback: se não encontrar o SKU exato (improvável), retorna o primeiro
+        # Fallback: Se não encontrou o SKU exato, mas a busca retornou algo, 
+        # é provável que o primeiro resultado seja o correto.
         if produtos:
+            # st.warning(f"SKU {sku} não encontrado com exatidão, retornando o mais próximo: {produtos[0]['sku']}")
             return produtos[0]
             
         return None # Nenhum produto encontrado
         
     except requests.exceptions.RequestException as e:
+        # O erro 400 Client Error será capturado aqui
         st.error(f"Erro de conexão com Nagumo ao buscar SKU {sku}: {e}")
         return None
     except Exception as e:
@@ -329,7 +323,7 @@ else:
                 st.warning(f"Item '{nome_json}' não possui 'sku' no arquivo JSON. Pulando.")
                 continue
 
-            # Busca o produto na API pelo SKU
+            # Busca o produto na API pelo SKU (usando a função corrigida)
             p = buscar_produto_nagumo_por_sku(str(sku))
 
             if not p:

@@ -5,7 +5,10 @@ import re
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Configurações para Shibata
+# ----------------------------------------------------------------------
+# CONSTANTES GLOBAIS
+# ----------------------------------------------------------------------
+JSON_FILE = "itens.json" # Define o nome do arquivo JSON
 TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
@@ -23,37 +26,34 @@ DEFAULT_IMAGE_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/sem-im
 
 
 # ----------------------------------------------------------------------
-# ⚠️ NOVA LISTA DE ITENS PARA COMPARAÇÃO (Simulando o conteúdo do itens.json)
-# O script agora itera sobre esta lista automaticamente.
-# O campo 'nome_busca' é usado para pesquisar nos APIs.
+# FUNÇÕES DE LEITURA E EXTRAÇÃO DO JSON
 # ----------------------------------------------------------------------
-LISTA_ITENS_COMPARA = [
-    {
-        "nome_busca": "Banana Nanica Kg",
-        "nome_exibicao": "🍌 Banana Nanica",
-        "nagumo_url": "https://www.nagumo.com/p/banana-nanica-kg-2004",
-        "shibata_url": "https://www.loja.shibata.com.br/produto/16286/banana-nanica-14kg-aprox-6-unidades"
-    },
-    {
-        "nome_busca": "Banana Prata Kg",
-        "nome_exibicao": "🍌 Banana Prata",
-        "nagumo_url": "https://www.nagumo.com/p/banana-prata-kg-2011",
-        "shibata_url": "https://www.loja.shibata.com.br/produto/16465/banana-prata-11kg-aprox-8-unidades"
-    },
-    {
-        "nome_busca": "Papel Higiênico Neve",
-        "nome_exibicao": "🧻 Papel Higiênico Neve",
-        "nagumo_url": "https://www.nagumo.com/p/papel-higi-neve-cmpr-4-un-14902",
-        "shibata_url": "https://www.loja.shibata.com.br/produto/29161/papel-hig-neve-toque-de-seda-c12"
-    },
-    {
-        "nome_busca": "Ovo Branco Grande 30",
-        "nome_exibicao": "🥚 Ovo Branco Grande 30",
-        "nagumo_url": "https://www.nagumo.com/p/ovo-branco-grande-com-30-unidades-122971",
-        "shibata_url": "https://www.loja.shibata.com.br/produto/23405/ovo-branco-extra-c30"
-    }
-]
 
+def ler_itens_json():
+    """Lê o arquivo JSON especificado pela constante JSON_FILE."""
+    try:
+        # Tenta ler o arquivo local
+        with open(JSON_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        st.error(f"Erro: Arquivo {JSON_FILE} não encontrado no diretório. Por favor, certifique-se de que ele existe.")
+        return []
+    except json.JSONDecodeError:
+        st.error(f"Erro: Não foi possível decodificar o arquivo {JSON_FILE}. Verifique se o JSON está formatado corretamente.")
+        return []
+    except Exception as e:
+        st.error(f"Erro inesperado ao ler o arquivo {JSON_FILE}: {e}")
+        return []
+
+def extrair_termos_busca(nome_completo):
+    """Extrai o nome de busca e o nome de exibição do campo 'nome' do JSON."""
+    # 1. Remove preços (R$XX ou R$X,XX) do nome
+    nome_sem_preco = re.sub(r'\sR\$\d+(?:[.,]\d+)?', '', nome_completo, flags=re.IGNORECASE).strip()
+    
+    # 2. Assume que o termo de busca é o nome sem preço e sem emojis (apenas letras, números e espaços)
+    nome_busca = re.sub(r'[^\w\s\-\/]', '', nome_sem_preco).strip()
+    
+    return nome_busca, nome_sem_preco # nome_busca, nome_exibicao
 
 # Funções utilitárias (mantidas)
 def remover_acentos(texto):
@@ -338,15 +338,12 @@ def obter_melhor_preco_shibata(produtos_ordenados):
     melhor_produto = produtos_ordenados[0]
     preco_total = float(melhor_produto.get('preco_oferta') or melhor_produto.get('preco') or 0)
     
-    # 1. Tenta usar o preço unitário calculado
     if melhor_produto['preco_unidade_val'] != float('inf') and melhor_produto['preco_unidade_val'] > 0:
         preco_unidade_val = melhor_produto['preco_unidade_val']
-        # Tenta extrair a unidade do string formatado se for R$/unidade_de_medida
         match = re.search(r"/\s*([a-zA-Z]+)", melhor_produto['preco_unidade_str'])
         unidade = match.group(1).lower() if match else "un"
         return preco_unidade_val, f"R$ {preco_unidade_val:.2f}/{unidade}"
     
-    # 2. Fallback para preço total se a unidade não pôde ser calculada
     unidade_sigla = melhor_produto.get('unidade_sigla') or 'un'
     return preco_total, f"R$ {preco_total:.2f}/{unidade_sigla.lower()}"
 
@@ -359,24 +356,28 @@ def obter_melhor_preco_nagumo(produtos_ordenados):
     preco_unitario_valor = melhor_produto['preco_unitario_valor']
     preco_unitario_str = melhor_produto['preco_unitario_str']
     
-    # 1. Tenta usar o preço unitário calculado
     if preco_unitario_valor != float('inf') and preco_unitario_valor > 0:
         return preco_unitario_valor, preco_unitario_str.replace('.', ',')
         
-    # 2. Fallback para preço total se a unidade não pôde ser calculada
     preco_exibir = (melhor_produto.get("promotion") or {}).get("conditions", [{}])[0].get("price") or melhor_produto.get("price", 0)
     return preco_exibir, f"R$ {preco_exibir:.2f}/un"
 
 # ----------------------------------------------------------------------
 # LÓGICA PRINCIPAL DE COMPARAÇÃO
 # ----------------------------------------------------------------------
-def realizar_comparacao_automatica(lista_itens):
-    """Executa a busca para a lista de itens e retorna os resultados formatados."""
+def realizar_comparacao_automatica():
+    """Executa a busca para a lista de itens lida do JSON e retorna os resultados formatados."""
+    lista_itens = ler_itens_json()
+    if not lista_itens:
+        return []
+
     resultados_finais = []
     
-    # Processa todos os itens em paralelo
     for item in lista_itens:
-        termo = item['nome_busca']
+        # 💡 Novo: Extrair termos de busca e nome de exibição do campo 'nome'
+        nome_completo = item['nome']
+        termo, nome_exibicao = extrair_termos_busca(nome_completo)
+        
         termo_sem_acento = remover_acentos(termo)
         palavras_termo = termo_sem_acento.split()
         
@@ -395,8 +396,7 @@ def realizar_comparacao_automatica(lista_itens):
         
         produtos_shibata_processados = []
         for p in produtos_shibata_filtrados:
-            if not p.get("disponivel", True):
-                continue
+            if not p.get("disponivel", True): continue
             preco = float(p.get('preco') or 0)
             em_oferta = p.get('em_oferta', False)
             oferta_info = p.get('oferta') or {}
@@ -405,8 +405,7 @@ def realizar_comparacao_automatica(lista_itens):
             descricao = p.get('descricao', '')
             quantidade_dif = p.get('quantidade_unidade_diferente')
             unidade_sigla = p.get('unidade_sigla')
-            if unidade_sigla and unidade_sigla.lower() == "grande":
-                unidade_sigla = None
+            if unidade_sigla and unidade_sigla.lower() == "grande": unidade_sigla = None
             preco_unidade_str = formatar_preco_unidade_personalizado(preco_total, quantidade_dif, unidade_sigla)
             descricao_limpa = descricao.lower().replace('grande', '').strip()
             preco_unidade_val, _ = calcular_preco_unidade(descricao_limpa, preco_total)
@@ -420,11 +419,9 @@ def realizar_comparacao_automatica(lista_itens):
                     elif unidade == "ml": quantidade /= 1000
                     if quantidade > 0:
                         preco_unidade_val = preco_total / quantidade
-                except:
-                    pass
+                except: pass
             
-            if not preco_unidade_val or preco_unidade_val == float('inf'):
-                preco_unidade_val = preco_total
+            if not preco_unidade_val or preco_unidade_val == float('inf'): preco_unidade_val = preco_total
             
             p['preco_unidade_val'] = preco_unidade_val
             p['preco_unidade_str'] = preco_unidade_str
@@ -434,7 +431,6 @@ def realizar_comparacao_automatica(lista_itens):
             
             produtos_shibata_processados.append(p)
         
-        # Ordenação: prioriza o menor preço unitário
         produtos_shibata_ordenados = sorted(produtos_shibata_processados, key=lambda x: x['preco_unidade_val'])
 
         # 2. Busca e Processamento Nagumo
@@ -464,7 +460,7 @@ def realizar_comparacao_automatica(lista_itens):
         preco_shibata_val, preco_shibata_str = obter_melhor_preco_shibata(produtos_shibata_ordenados)
         preco_nagumo_val, preco_nagumo_str = obter_melhor_preco_nagumo(produtos_nagumo_ordenados)
 
-        # Determina o preço mais baixo e o formato do nome
+        # Determina o preço mais baixo para exibição
         preco_principal_str = ""
         if preco_shibata_val <= preco_nagumo_val:
             preco_principal_str = preco_shibata_str
@@ -476,14 +472,14 @@ def realizar_comparacao_automatica(lista_itens):
         
         # Monta o objeto final
         resultados_finais.append({
-            "nome": f"{item['nome_exibicao']} ({preco_principal_str})",
-            "nagumo": item['nagumo_url'],
-            "shibata": item['shibata_url'],
+            # Usa o nome de exibição limpo (com emoji, sem R$ hardcoded) + preço dinâmico
+            "nome": f"{nome_exibicao} ({preco_principal_str})",
+            "nagumo": item['nagumo'], # Usa o link original do JSON
+            "shibata": item['shibata'], # Usa o link original do JSON
             "shibata_preco_val": preco_shibata_val,
             "nagumo_preco_val": preco_nagumo_val
         })
         
-    # Ordena o resultado final pelo menor preço encontrado
     resultados_finais.sort(key=lambda x: min(x['shibata_preco_val'], x['nagumo_preco_val']))
     
     return resultados_finais
@@ -521,41 +517,41 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h6>🛒 Comparação Automática de Preços</h6>", unsafe_allow_html=True)
-st.markdown("Ajuste automático para comparar itens predefinidos na lista interna do código.")
+st.markdown(f"<h6>🛒 Comparação Automática de Preços (Lendo {JSON_FILE})</h6>", unsafe_allow_html=True)
+st.markdown("Itens carregados e comparados automaticamente.")
 
 # Executa a comparação
-resultados_comparacao = realizar_comparacao_automatica(LISTA_ITENS_COMPARA)
+with st.spinner("🔍 Buscando e comparando preços..."):
+    resultados_comparacao = realizar_comparacao_automatica()
 
-st.markdown("<h5>Resultados Comparativos (Preços Unitários Mais Baixos)</h5>", unsafe_allow_html=True)
+if resultados_comparacao:
+    st.markdown("<h5>Resultados Comparativos (Preços Unitários Mais Baixos)</h5>", unsafe_allow_html=True)
 
-# Exibe os resultados na lista formatada
-for item in resultados_comparacao:
-    # Determina o mercado com o preço mais baixo para destaque
-    is_shibata_melhor = item['shibata_preco_val'] <= item['nagumo_preco_val']
-    
-    shibata_link_style = "color: red; font-weight: bold;" if is_shibata_melhor and item['shibata_preco_val'] != float('inf') else "color: #880000;"
-    nagumo_link_style = "color: red; font-weight: bold;" if not is_shibata_melhor and item['nagumo_preco_val'] != float('inf') else "color: #004488;"
-    
-    # Formata os preços para exibição
-    shibata_preco_str_final = f"R$ {item['shibata_preco_val']:.2f}" if item['shibata_preco_val'] != float('inf') else "N/D"
-    nagumo_preco_str_final = f"R$ {item['nagumo_preco_val']:.2f}" if item['nagumo_preco_val'] != float('inf') else "N/D"
+    # Exibe os resultados na lista formatada
+    for item in resultados_comparacao:
+        is_shibata_melhor = item['shibata_preco_val'] <= item['nagumo_preco_val']
+        
+        shibata_link_style = "color: red; font-weight: bold;" if is_shibata_melhor and item['shibata_preco_val'] != float('inf') else "color: #880000;"
+        nagumo_link_style = "color: red; font-weight: bold;" if not is_shibata_melhor and item['nagumo_preco_val'] != float('inf') else "color: #004488;"
+        
+        shibata_preco_str_final = f"R$ {item['shibata_preco_val']:.2f}".replace('.', ',') if item['shibata_preco_val'] != float('inf') else "N/D"
+        nagumo_preco_str_final = f"R$ {item['nagumo_preco_val']:.2f}".replace('.', ',') if item['nagumo_preco_val'] != float('inf') else "N/D"
 
-    # Monta o HTML do item de comparação
-    st.markdown(f"""
-        <div class='comparison-item'>
-            <div class='price-badge'>
-                {item['nome']}
+        st.markdown(f"""
+            <div class='comparison-item'>
+                <div class='price-badge'>
+                    {item['nome']}
+                </div>
+                
+                <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
+                    <img src="{LOGO_SHIBATA_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Shibata: {shibata_preco_str_final}
+                </a>
+                
+                <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
+                    <img src="{LOGO_NAGUMO_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Nagumo: {nagumo_preco_str_final}
+                </a>
             </div>
-            
-            <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
-                <img src="{LOGO_SHIBATA_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Shibata: {shibata_preco_str_final}
-            </a>
-            
-            <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
-                <img src="{LOGO_NAGUMO_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Nagumo: {nagumo_preco_str_final}
-            </a>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-st.json(resultados_comparacao)
+    st.markdown("<h5>Saída JSON (Estrutura Completa)</h5>", unsafe_allow_html=True)
+    st.json(resultados_comparacao)

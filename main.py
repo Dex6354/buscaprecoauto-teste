@@ -2,8 +2,8 @@ import streamlit as st
 import requests
 import unicodedata
 import re
-import json # Importação necessária
-from bs4 import BeautifulSoup # Importação necessária (instale com: pip install beautifulsoup4)
+import json
+from bs4 import BeautifulSoup
 
 # Configurações para Shibata (TOKEN E HEADERS REMOVIDOS - NÃO SÃO MAIS NECESSÁRIOS)
 
@@ -116,8 +116,8 @@ def fetch_shibata_product_by_scraping(produto_id):
     if not produto_id:
         return None
     
-    # Monta a URL pública do produto
-    url = f"https://www.loja.shibata.com.br/produto/{produto_id}"
+    # Monta a URL pública do produto (inclui um nome dummy para funcionar como no site)
+    url = f"https://www.loja.shibata.com.br/produto/{produto_id}/nome-dummy-para-url"
     
     try:
         # Headers de navegador para evitar bloqueios simples
@@ -127,9 +127,8 @@ def fetch_shibata_product_by_scraping(produto_id):
         
         response = requests.get(url, headers=headers, timeout=10)
         
-        if response.status_code != 200:
-            st.error(f"Falha ao acessar a página do produto (ID: {produto_id}). Status: {response.status_code}")
-            return None
+        # O site pode retornar 404 para a URL com nome dummy, mas se a página de erro tiver o NEXT_DATA, ainda funciona.
+        # Vamos verificar se o JSON está lá mesmo em caso de status != 200.
 
         # Usar BeautifulSoup para parsear o HTML
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -138,11 +137,15 @@ def fetch_shibata_product_by_scraping(produto_id):
         script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
         
         if not script_tag:
-            st.error(f"Não foi possível encontrar a tag '__NEXT_DATA__' na página do produto (ID: {produto_id}). O site pode ter mudado.")
+            st.error(f"Não foi possível encontrar a tag '__NEXT_DATA__' na página do produto (ID: {produto_id}). O site pode ter mudado ou o produto não existe.")
             return None
 
         # Extrair o conteúdo JSON da tag
-        json_data = json.loads(script_tag.string)
+        try:
+            json_data = json.loads(script_tag.string)
+        except json.JSONDecodeError:
+            st.error("Erro ao decodificar o JSON da tag '__NEXT_DATA__'.")
+            return None
         
         # Navegar na estrutura do JSON para encontrar o objeto do produto
         # O caminho é props -> pageProps -> data -> produto
@@ -150,16 +153,16 @@ def fetch_shibata_product_by_scraping(produto_id):
         
         if not produto_data:
             # Pode ser uma página de erro ou "produto não encontrado"
-            st.warning(f"Produto (ID: {produto_id}) não encontrado nos dados da página (__NEXT_DATA__).")
+            st.warning(f"Produto (ID: {produto_id}) não encontrado nos dados da página (__NEXT_DATA__). Verifique se o ID está correto.")
             return None
+        
+        # Adiciona o produto_id da URL (que é o que o usuário digitou) ao objeto para garantir que seja exibido
+        produto_data['produto_id_url'] = produto_id 
             
         return produto_data
 
     except requests.exceptions.RequestException as e:
         st.error(f"Erro de conexão ao raspar o Shibata: {e}")
-        return None
-    except json.JSONDecodeError:
-        st.error("Erro ao decodificar o JSON da tag '__NEXT_DATA__'.")
         return None
     except Exception as e:
         st.error(f"Erro inesperado no scraping do Shibata: {e}")
@@ -250,12 +253,13 @@ st.markdown("""
 
 # --- ENTRADA (Mantida) ---
 st.markdown("<h6>🛒 Preços Mercados (Busca por ID)</h6>", unsafe_allow_html=True)
-st.info("Atenção: A biblioteca BeautifulSoup4 é necessária. Instale com: pip install beautifulsoup4")
+st.info("Atenção: A biblioteca BeautifulSoup4 é necessária. Instale com: `pip install beautifulsoup4`")
 produto_id_input = st.text_input("🔎 Digite o Produto_id (Ex: 16286):", "16286").strip()
 
 
 # --- LÓGICA PRINCIPAL MODIFICADA ---
 if produto_id_input:
+    # Usamos o st.container() com uma chave para garantir que a coluna seja criada corretamente no layout wide
     col_shibata = st.container()
 
     with st.spinner(f"🔍 Buscando Produto_id {produto_id_input} na página..."):
@@ -320,7 +324,10 @@ if produto_id_input:
                 oferta_info = p.get('oferta') or {}
                 preco_oferta = oferta_info.get('preco_oferta')
                 preco_antigo = oferta_info.get('preco_antigo')
+                # O ID da URL que foi adicionado na função de scraping
+                produto_id_url = p.get('produto_id_url', 'N/A') 
 
+                # A imagem usa o caminho /500x500/{imagem} - ajustado para o asset URL correto
                 imagem_url = f"https://produto-assets-vipcommerce-com-br.br-se1.magaluobjects.com/500x500/{imagem}" if imagem else DEFAULT_IMAGE_URL
                 preco_total = float(preco_oferta) if em_oferta and preco_oferta else preco
 
@@ -355,37 +362,49 @@ if produto_id_input:
 
                 preco_antigo_html = ""
                 if em_oferta and preco_oferta and preco_antigo:
-                    preco_oferta_val = float(preco_oferta)
-                    preco_antigo_val = float(preco_antigo)
-                    desconto = round(100 * (preco_antigo_val - preco_oferta_val) / preco_antigo_val)
-                    preco_html = f"""
-                        <span style='font-weight: bold; font-size: 1rem;'>R$ {preco_oferta_val:.2f}</span>
-                        <span style='color: red; font-weight: bold; font-size: 0.7rem;'> ({desconto}% OFF)</span>
-                    """
-                    preco_antigo_html = f"<span style='text-decoration: line-through; color: gray; font-size: 0.75rem;'>R$ {preco_antigo_val:.2f}</span>"
+                    try:
+                        preco_oferta_val = float(preco_oferta)
+                        preco_antigo_val = float(preco_antigo)
+                        desconto = round(100 * (preco_antigo_val - preco_oferta_val) / preco_antigo_val)
+                        preco_html = f"""
+                            <span style='font-weight: bold; font-size: 1rem;'>R$ {preco_oferta_val:.2f}</span>
+                            <span style='color: red; font-weight: bold; font-size: 0.7rem;'> ({desconto}% OFF)</span>
+                        """
+                        preco_antigo_html = f"<span style='text-decoration: line-through; color: gray; font-size: 0.75rem;'>R$ {preco_antigo_val:.2f}</span>"
+                    except ValueError:
+                        preco_html = f"<span style='font-weight: bold; font-size: 1rem;'>R$ {preco:.2f}</span>"
                 else:
                     preco_html = f"<span style='font-weight: bold; font-size: 1rem;'>R$ {preco:.2f}</span>"
 
                 campos_excluidos = [
                     'id', 'descricao', 'nome', 'preco', 'preco_unidade_val', 'preco_unidade_str',
                     'preco_por_metro_val', 'preco_por_folha_val', 'em_oferta', 'oferta', 'imagem',
-                    'quantidade_unidade_diferente', 'unidade_sigla', 'disponivel'
+                    'quantidade_unidade_diferente', 'unidade_sigla', 'disponivel', 'produto_id_url'
                 ]
+                
+                # 'produto_id' é o ID interno retornado pelo objeto JSON
+                produto_id_interno = p.get('produto_id', 'N/A') 
 
                 campos_adicionais_html = ""
                 for key, value in p.items():
                     if key not in campos_excluidos and value is not None:
                         if isinstance(value, dict):
-                            detail = ', '.join(f'{k}: {v}' for k, v in value.items() if v is not None)
+                            detail = ', '.join(f'{k}: {v}' for k, v in value.items() if v is not None and k not in ('id', 'preco_antigo', 'preco_oferta'))
                             if detail:
                                 campos_adicionais_html += f"<div>**{key.capitalize()}**: {detail}</div>"
                         elif isinstance(value, list):
                             campos_adicionais_html += f"<div>**{key.capitalize()}**: [Lista com {len(value)} item(ns)]</div>"
                         else:
-                            campos_adicionais_html += f"<div>**{key.capitalize()}**: {value}</div>"
+                            # Tenta formatar números grandes para evitar notação científica
+                            if isinstance(value, (int, float)) and abs(value) > 99999:
+                                value_str = f"{value:.2f}".replace('.', ',')
+                            elif isinstance(value, float):
+                                value_str = f"{value:.2f}".replace('.', ',')
+                            else:
+                                value_str = str(value)
+                                
+                            campos_adicionais_html += f"<div>**{key.capitalize()}**: {value_str}</div>"
                 
-                produto_id_api = p.get('produto_id', 'N/A') 
-
                 if not campos_adicionais_html:
                      campos_adicionais_html = "<div>Nenhum campo adicional encontrado na resposta da API além dos já exibidos.</div>"
 
@@ -402,9 +421,9 @@ if produto_id_input:
                             {preco_info_extra}
 
                             <div style="margin-top: 5px; border-top: 1px dashed #eee; padding-top: 5px; font-size: 0.7em;">
-                                <div style="font-weight: bold; color: #333;">TODOS OS CAMPOS DO OBJETO (Possíveis):</div>
-                                <div>**ID (Interno)**: {id_item}</div>
-                                <div>**Produto_id (da URL)**: {produto_id_api}</div>
+                                <div style="font-weight: bold; color: #333;">TODOS OS CAMPOS DO OBJETO:</div>
+                                <div>**Produto_ID (da URL)**: {produto_id_url}</div>
+                                <div>**ID (Objeto JSON)**: {produto_id_interno}</div>
                                 {campos_adicionais_html}
                             </div>
                         </div>

@@ -2,14 +2,10 @@ import streamlit as st
 import requests
 import unicodedata
 import re
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ----------------------------------------------------------------------
-# CONSTANTES GLOBAIS
-# ----------------------------------------------------------------------
-JSON_FILE = "itens.json" # Define o nome do arquivo JSON
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESwPH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
+# Configurações para Shibata
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
     "Authorization": f"Bearer {TOKEN}",
@@ -20,143 +16,31 @@ HEADERS_SHIBATA = {
 }
 
 # Links dos logos
-LOGO_SHIBATA_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-shibata.png"
-LOGO_NAGUMO_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-nagumo2.png"
-DEFAULT_IMAGE_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/sem-imagem.png"
+LOGO_SHIBATA_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-shibata.png" # Logo do Shibata
+DEFAULT_IMAGE_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/sem-imagem.png" # Imagem padrão
 
 
-# ----------------------------------------------------------------------
-# FUNÇÕES DE LEITURA E EXTRAÇÃO DO JSON
-# ----------------------------------------------------------------------
-
-def ler_itens_json():
-    """Lê o arquivo JSON especificado pela constante JSON_FILE."""
-    try:
-        with open(JSON_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        st.error(f"Erro: Arquivo {JSON_FILE} não encontrado no diretório. Usando lista de fallback.")
-        # Fallback list simulating the JSON content
-        return [
-            { "nome": "🍌 Banana Nanica R$6", "nagumo": "https://www.nagumo.com/p/banana-nanica-kg-2004", "shibata": "https://www.loja.shibata.com.br/produto/16286/banana-nanica-14kg-aprox-6-unidades" },
-            { "nome": "🍌 Banana Prata R$7", "nagumo": "https://www.nagumo.com/p/banana-prata-kg-2011", "shibata": "https://www.loja.shibata.com.br/produto/16465/banana-prata-11kg-aprox-8-unidades" }
-        ]
-    except json.JSONDecodeError:
-        st.error(f"Erro: Não foi possível decodificar o arquivo {JSON_FILE}. Verifique se o JSON está formatado corretamente.")
-        return []
-    except Exception as e:
-        st.error(f"Erro inesperado ao ler o arquivo {JSON_FILE}: {e}")
-        return []
-
-def extrair_termos_busca(nome_completo):
-    """Extrai o nome de exibição (mantido apenas para formatar o output)."""
-    # Remove preços (R$XX ou R$X,XX) do nome para obter o nome de exibição limpo
-    nome_sem_preco = re.sub(r'\sR\$\d+(?:[.,]\d+)?', '', nome_completo, flags=re.IGNORECASE).strip()
-    return nome_sem_preco # Retorna o nome de exibição
-
-def extract_shibata_produto_id(url):
-    """Extrai o Produto_id do produto da URL do Shibata."""
-    match = re.search(r'/produto/(\d+)/', url)
-    return match.group(1) if match else None
-
-def extract_nagumo_sku(url):
-    """Extrai o SKU do produto da URL do Nagumo."""
-    # O SKU geralmente é o número no final da URL
-    match = re.search(r'-(\d+)$', url)
-    return match.group(1) if match else None
-
-
-# ----------------------------------------------------------------------
-# NOVAS FUNÇÕES DE BUSCA DIRETA POR ID/SKU
-# ----------------------------------------------------------------------
-
-def fetch_shibata_product(produto_id):
-    """Busca um produto específico no Shibata pelo Produto_id."""
-    if not produto_id:
-        return None
-    # Endpoint de busca direta por Produto_id
-    url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produto/{produto_id}"
-    try:
-        response = requests.get(url, headers=HEADERS_SHIBATA, timeout=10)
-        if response.status_code == 200:
-            # Retorna o objeto 'produto' dentro de 'data'
-            return response.json().get('data', {}).get('produto')
-        return None
-    except requests.exceptions.RequestException:
-        return None
-    except Exception:
-        return None
-
-def fetch_nagumo_product(sku):
-    """Busca um produto específico no Nagumo pelo SKU usando a API GraphQL."""
-    url = "https://nextgentheadless.instaleap.io/api/v3"
-    headers = {
-        "Content-Type": "application/json",
-        "Origin": "https://www.nagumo.com",
-        "Referer": "https://www.nagumo.com/",
-        "User-Agent": "Mozilla/5.0",
-        "apollographql-client-name": "Ecommerce SSR",
-        "apollographql-client-version": "0.11.0"
-    }
-    payload = {
-        "operationName": "SearchProducts",
-        "variables": {
-            "searchProductsInput": {
-                "clientId": "NAGUMO",
-                "storeReference": "22",
-                "currentPage": 1,
-                "minScore": 1,
-                "pageSize": 1,
-                "search": [{"query": sku}], # Busca diretamente pelo SKU
-                "filters": {},
-                "googleAnalyticsSessionId": ""
-            }
-        },
-        "query": """
-        query SearchProducts($searchProductsInput: SearchProductsInput!) {
-          searchProducts(searchProductsInput: $searchProductsInput) {
-            products {
-              name
-              price
-              photosUrl
-              sku
-              stock
-              description
-              unit
-              promotion {
-                isActive
-                type
-                conditions {
-                  price
-                  priceBeforeTaxes
-                }
-              }
-            }
-          }
-        }
-        """
-    }
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
-        data = response.json()
-        products = data.get("data", {}).get("searchProducts", {}).get("products", [])
-        # Confirma que o SKU retornado é o SKU buscado (evita resultados de busca ampla)
-        for product in products:
-            if str(product.get('sku')) == sku:
-                return product
-        return None
-    except requests.exceptions.RequestException:
-        return None
-    except Exception:
-        return None
-
-
-# ----------------------------------------------------------------------
-# FUNÇÕES DE CÁLCULO DE PREÇO UNITÁRIO (Mantidas)
-# ----------------------------------------------------------------------
+# Funções utilitárias
 def remover_acentos(texto):
-    if not texto: return ""
+    if not texto:
+        return ""
     return ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').lower()
+
+# --- Funções de Cálculo de Preço (Mantidas do seu arquivo) ---
+def calcular_precos_papel(descricao, preco_total):
+    desc_minus = descricao.lower()
+    match_leve = re.search(r'leve\s*(\d+)', desc_minus)
+    if match_leve:
+        q_rolos = int(match_leve.group(1))
+    else:
+        match_rolos = re.search(r'(\d+)\s*(rolos|unidades|uni|pacotes|pacote)', desc_minus)
+        q_rolos = int(match_rolos.group(1)) if match_rolos else None
+    match_metros = re.search(r'(\d+(?:[\.,]\d+)?)\s*m(?:etros)?', desc_minus)
+    m_rolos = float(match_metros.group(1).replace(',', '.')) if match_metros else None
+    if q_rolos and m_rolos:
+        preco_por_metro = preco_total / (q_rolos * m_rolos)
+        return preco_por_metro, f"R$ {preco_por_metro:.3f}".replace('.', ',') + "/m"
+    return None, None
 
 def calcular_preco_unidade(descricao, preco_total):
     desc_minus = remover_acentos(descricao)
@@ -178,230 +62,342 @@ def calcular_preco_unidade(descricao, preco_total):
         return preco_total / litros, f"R$ {preco_total / litros:.2f}".replace('.', ',') + "/L"
     return None, None
 
+def calcular_preco_papel_toalha(descricao, preco_total):
+    desc = descricao.lower()
+    qtd_unidades = None
+    match_unidades = re.search(r'(\d+)\s*(rolos|unidades|pacotes|pacote|kits?)', desc)
+    if match_unidades:
+        qtd_unidades = int(match_unidades.group(1))
+
+    folhas_por_unidade = None
+    match_folhas = re.search(r'(\d+)\s*(folhas|toalhas)\s*cada', desc)
+    if not match_folhas:
+        match_folhas = re.search(r'(\d+)\s*(folhas|toalhas)', desc)
+    if match_folhas:
+        folhas_por_unidade = int(match_folhas.group(1))
+
+    match_leve_folhas = re.search(r'leve\s*(\d+)\s*pague\s*\d+\s*folhas', desc)
+    if match_leve_folhas:
+        folhas_leve = int(match_leve_folhas.group(1))
+        preco_por_folha = preco_total / folhas_leve if folhas_leve else None
+        return folhas_leve, preco_por_folha
+
+    match_leve_pague = re.findall(r'(\d+)', desc)
+    folhas_leve = None
+    if 'leve' in desc and 'folhas' in desc and match_leve_pague:
+        folhas_leve = max(int(n) for n in match_leve_pague)
+
+    match_unidades_kit = re.search(r'unidades por kit[:\- ]+(\d+)', desc)
+    match_folhas_rolo = re.search(r'quantidade de folhas por (?:rolo|unidade)[:\- ]+(\d+)', desc)
+    if match_unidades_kit and match_folhas_rolo:
+        total_folhas = int(match_unidades_kit.group(1)) * int(match_folhas_rolo.group(1))
+        preco_por_folha = preco_total / total_folhas if total_folhas else None
+        return total_folhas, preco_por_folha
+
+    if qtd_unidades and folhas_por_unidade:
+        total_folhas = qtd_unidades * folhas_por_unidade
+        preco_por_folha = preco_total / total_folhas if total_folhas else None
+        return total_folhas, preco_por_folha
+
+    if folhas_por_unidade:
+        preco_por_folha = preco_total / folhas_por_unidade
+        return folhas_por_unidade, preco_por_folha
+
+    if folhas_leve:
+        preco_por_folha = preco_total / folhas_leve
+        return folhas_leve, preco_por_folha
+
+    return None, None
+
 def formatar_preco_unidade_personalizado(preco_total, quantidade, unidade):
-    if not unidade: return None
+    if not unidade:
+        return None
     unidade = unidade.lower()
     if quantidade and quantidade != 1:
         return f"R$ {preco_total:.2f}".replace('.', ',') + f"/{str(quantidade).replace('.', ',')}{unidade.lower()}"
     else:
         return f"R$ {preco_total:.2f}".replace('.', ',') + f"/{unidade.lower()}"
 
-def contem_papel_toalha(texto):
-    return "papel" in remover_acentos(texto.lower()) and "toalha" in remover_acentos(texto.lower())
-
-def extrair_info_papel_toalha(nome, descricao):
-    texto_nome = remover_acentos(nome.lower())
-    texto_desc = remover_acentos(descricao.lower())
-    texto_completo = f"{texto_nome} {texto_desc}"
-    match = re.search(r'(\d+)\s*(un|unidades?|rolos?)\s*.*?(\d+)\s*(folhas|toalhas)', texto_completo)
-    if match:
-        rolos = int(match.group(1))
-        folhas_por_rolo = int(match.group(3))
-        total_folhas = rolos * folhas_por_rolo
-        return total_folhas
-    match = re.search(r'(\d+)\s*(folhas|toalhas)', texto_completo)
-    if match:
-        return int(match.group(1))
-    m_un = re.search(r"(\d+)\s*(un|unidades?)", texto_completo)
-    if m_un:
-        return int(m_un.group(1))
-    return None
-
-def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=None):
-    texto_completo = f"{nome} {descricao}".lower()
-    if contem_papel_toalha(texto_completo):
-        total_folhas = extrair_info_papel_toalha(nome, descricao)
-        if total_folhas and total_folhas > 0:
-            preco_por_item = preco_valor / total_folhas
-            return f"R$ {preco_por_item:.3f}/folha"
-        return "Preço por folha: n/d"
-    if "papel higi" in texto_completo:
-        match_rolos = re.search(r"(\d+)\s*rolos?", texto_completo)
-        match_metros = re.search(r"(\d+[.,]?\d*)\s*(m|metros?|mt)", texto_completo)
-        if match_rolos and match_metros:
-            try:
-                rolos = int(match_rolos.group(1))
-                metros = float(match_metros.group(1).replace(',', '.'))
-                if rolos > 0 and metros > 0:
-                    preco_por_metro = preco_valor / rolos / metros
-                    return f"R$ {preco_por_metro:.3f}/m"
-            except: pass
-    
-    # Lógica padrão para Kg/L/Un
-    val, str_ = calcular_preco_unidade(texto_completo, preco_valor)
-    if str_ and "R$" in str_: return str_
-    
-    # Fallback para unidade da API
-    if unidade_api:
-        unidade_api = unidade_api.lower()
-        if unidade_api == 'kg': return f"R$ {preco_valor:.2f}/kg"
-        elif unidade_api == 'l': return f"R$ {preco_valor:.2f}/L"
-        elif unidade_api == 'un': return f"R$ {preco_valor:.2f}/un"
-    return f"R$ {preco_valor:.2f}/un"
-
-def extrair_valor_unitario(preco_unitario):
-    match = re.search(r"R\$ (\d+[.,]?\d*)", preco_unitario)
-    if match:
-        return float(match.group(1).replace(',', '.'))
-    return float('inf')
-
-
-# ----------------------------------------------------------------------
-# LÓGICA PRINCIPAL DE COMPARAÇÃO
-# ----------------------------------------------------------------------
-def realizar_comparacao_automatica():
-    """Executa a busca por link e retorna os resultados formatados."""
-    lista_itens = ler_itens_json()
-    if not lista_itens:
-        return []
-
-    resultados_finais = []
-    
-    for item in lista_itens:
-        nome_exibicao = extrair_termos_busca(item['nome'])
-        
-        shibata_produto_id = extract_shibata_produto_id(item['shibata'])
-        nagumo_sku = extract_nagumo_sku(item['nagumo'])
-
-        shibata_produto = fetch_shibata_product(shibata_produto_id)
-        nagumo_produto = fetch_nagumo_product(nagumo_sku)
-
-        # 1. Processamento Shibata
-        preco_shibata_val = float('inf')
-        preco_shibata_str = "Preço indisponível"
-        if shibata_produto:
-            p = shibata_produto
-            preco = float(p.get('preco') or 0)
-            em_oferta = p.get('em_oferta', False)
-            oferta_info = p.get('oferta') or {}
-            preco_oferta = oferta_info.get('preco_oferta')
-            preco_total = float(preco_oferta) if em_oferta and preco_oferta else preco
-            descricao = p.get('descricao', '')
-            quantidade_dif = p.get('quantidade_unidade_diferente')
-            unidade_sigla = p.get('unidade_sigla')
-            
-            # Tenta calcular o preço unitário
-            preco_unidade_val, preco_unidade_str_temp = calcular_preco_unidade(descricao, preco_total)
-            
-            if preco_unidade_val and preco_unidade_val > 0 and preco_unidade_val != float('inf'):
-                preco_shibata_val = preco_unidade_val
-                preco_shibata_str = preco_unidade_str_temp
-            else:
-                # Fallback para preço por unidade padrão do produto
-                if unidade_sigla and unidade_sigla.lower() == "grande": unidade_sigla = "un"
-                preco_shibata_str = formatar_preco_unidade_personalizado(preco_total, quantidade_dif, unidade_sigla or "un")
-                preco_shibata_val = preco_total / (quantidade_dif if quantidade_dif else 1)
-        
-        # 2. Processamento Nagumo
-        preco_nagumo_val = float('inf')
-        preco_nagumo_str = "Preço indisponível"
-        if nagumo_produto:
-            p = nagumo_produto
-            preco_normal = p.get("price", 0)
-            promocao = p.get("promotion") or {}
-            cond = promocao.get("conditions") or []
-            preco_desconto = None
-            if promocao.get("isActive") and isinstance(cond, list) and len(cond) > 0:
-                preco_desconto = cond[0].get("price")
-            preco_exibir = preco_desconto if preco_desconto else preco_normal
-
-            preco_nagumo_str = calcular_preco_unitario_nagumo(preco_exibir, p.get('description', ''), p.get('name', ''), p.get("unit"))
-            preco_nagumo_val = extrair_valor_unitario(preco_nagumo_str)
-
-
-        # 3. Formata os Resultados Finais
-        
-        # Determina o preço mais baixo para exibição
-        preco_principal_str = ""
-        if preco_shibata_val <= preco_nagumo_val:
-            preco_principal_str = preco_shibata_str
-        elif preco_nagumo_val < preco_shibata_val:
-            preco_principal_str = preco_nagumo_str
+# --- NOVA FUNÇÃO DE BUSCA POR PRODUTO_ID ---
+def fetch_shibata_product_by_id(produto_id):
+    """Busca um produto específico no Shibata pelo Produto_id."""
+    if not produto_id:
+        return None
+    # Este é o endpoint para buscar um produto único pelo ID
+    url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produto/{produto_id}"
+    try:
+        response = requests.get(url, headers=HEADERS_SHIBATA, timeout=10)
+        if response.status_code == 200:
+            # A API retorna {'data': {'produto': {...}}}
+            return response.json().get('data', {}).get('produto')
         else:
-            preco_principal_str = preco_shibata_str if preco_shibata_str != "Preço indisponível" else preco_nagumo_str
+            st.error(f"Falha ao buscar Produto_id {produto_id}. Status: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro de conexão ao buscar Shibata: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Erro inesperado ao buscar Shibata: {e}")
+        return None
 
-        
-        # Monta o objeto final
-        resultados_finais.append({
-            "nome": f"{nome_exibicao} ({preco_principal_str})",
-            "nagumo": item['nagumo'],
-            "shibata": item['shibata'],
-            "shibata_preco_val": preco_shibata_val,
-            "nagumo_preco_val": preco_nagumo_val
-        })
-        
-    resultados_finais.sort(key=lambda x: min(x['shibata_preco_val'], x['nagumo_preco_val']))
-    
-    return resultados_finais
-
-# ----------------------------------------------------------------------
-# CONFIGURAÇÃO E EXIBIÇÃO DO STREAMLIT
-# ----------------------------------------------------------------------
-st.set_page_config(page_title="Comparador de Preços", page_icon="🛒", layout="wide")
+# Configuração da página (Mantida do seu arquivo)
+st.set_page_config(page_title="Preços Mercados", page_icon="🛒", layout="wide")
 
 st.markdown("""
     <style>
         .block-container { padding-top: 0rem; }
         footer {visibility: hidden;}
         #MainMenu {visibility: hidden;}
-        .comparison-item {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 10px;
+        div, span, strong, small { font-size: 0.75rem !important; }
+        img { max-width: 100px; height: auto; }
+        .product-container {
             display: flex;
-            flex-direction: column;
-            gap: 5px;
+            align-items: center;
+            gap: 10px;
         }
-        .price-badge {
-            font-weight: bold;
-            font-size: 1.1em;
+        .product-image {
+            min-width: 80px;
+            max-width: 80px;
+            flex-shrink: 0;
         }
-        .market-link {
-            text-decoration: none;
-            display: block;
-            padding: 5px 0;
+        .product-info {
+            flex: 1 1 auto;
+            min-width: 0; /* 👈 ESSENCIAL para permitir quebra */
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
-        .shibata-link { color: #880000; }
-        .nagumo-link { color: #004488; }
+        hr.product-separator {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 10px 0;
+        }
+        .info-cinza {
+            color: gray;
+            font-size: 0.8rem;
+        }
+       [data-testid="stColumn"] {
+            overflow-y: auto;
+            max-height: 90vh;
+            padding: 10px;
+            border: 1px solid #f0f2f6;
+            border-radius: 8px;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+            background: transparent;
+            scrollbar-width: thin;
+            scrollbar-color: gray transparent;  /* Firefox: thumb branco, track transparente */
+        }
+        [data-testid="stColumn"]::-webkit-scrollbar {
+            width: 6px;
+            background: transparent;
+        }
+        [data-testid="stColumn"]::-webkit-scrollbar-track {
+            background: transparent; /* fundo transparente */
+        }
+        [data-testid="stColumn"]::-webkit-scrollbar-thumb {
+            background-color: gray; /* barrinha branca translúcida */
+            border-radius: 3px;
+            border: 1px solid transparent;
+        }
+        [data-testid="stColumn"]::-webkit-scrollbar-thumb:hover {
+            background-color: white; /* barrinha mais visível ao passar o mouse */
+        }
+        .block-container {
+            padding-right: 47px !important;  /* Tamanho do espaco para rolagem */
+        }
+        input[type="text"] {
+            font-size: 0.8rem !important;
+        }
+        .block-container { 
+            padding-bottom: 15px !important; 
+            margin-bottom: 15px !important; 
+        } 
+        [data-testid="stColumn"] { 
+            margin-bottom: 20px; 
+        } 
+        header[data-testid="stHeader"] { 
+            display: none; 
+        } 
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown(f"<h6>🛒 Comparação Automática de Preços (Busca por Link no {JSON_FILE})</h6>", unsafe_allow_html=True)
-st.markdown("Itens carregados e comparados por ID/SKU do produto.")
+# --- ENTRADA MODIFICADA ---
+st.markdown("<h6>🛒 Preços Mercados (Busca por ID)</h6>", unsafe_allow_html=True)
+produto_id_input = st.text_input("🔎 Digite o Produto_id (Ex: 16286):", "16286").strip()
 
-# Executa a comparação
-with st.spinner("🔍 Buscando e comparando preços..."):
-    resultados_comparacao = realizar_comparacao_automatica()
 
-if resultados_comparacao:
-    st.markdown("<h5>Resultados Comparativos (Preços Unitários Mais Baixos)</h5>", unsafe_allow_html=True)
+# --- LÓGICA PRINCIPAL MODIFICADA ---
+if produto_id_input:
+    # Cria a coluna/container
+    col_shibata = st.container()
 
-    # Exibe os resultados na lista formatada
-    for item in resultados_comparacao:
-        is_shibata_melhor = item['shibata_preco_val'] <= item['nagumo_preco_val']
+    with st.spinner(f"🔍 Buscando Produto_id {produto_id_input}..."):
+        # 1. Busca o produto único
+        produto_encontrado = fetch_shibata_product_by_id(produto_id_input)
         
-        shibata_link_style = "color: red; font-weight: bold;" if is_shibata_melhor and item['shibata_preco_val'] != float('inf') else "color: #880000;"
-        nagumo_link_style = "color: red; font-weight: bold;" if not is_shibata_melhor and item['nagumo_preco_val'] != float('inf') else "color: #004488;"
+        produtos_para_exibir = [] # Usamos uma lista para manter a lógica de loop de exibição
+
+        if produto_encontrado:
+            # 2. Processa o produto (lógica de cálculo de preço do seu arquivo)
+            p = produto_encontrado
+            
+            if not p.get("disponivel", True):
+                st.warning("Produto encontrado, mas está marcado como indisponível.")
+                # Mesmo indisponível, vamos processar para exibir os dados
+
+            preco = float(p.get('preco') or 0)
+            em_oferta = p.get('em_oferta', False)
+            oferta_info = p.get('oferta') or {}
+            preco_oferta = oferta_info.get('preco_oferta')
+            preco_total = float(preco_oferta) if em_oferta and preco_oferta else preco
+            descricao = p.get('descricao', '')
+
+            # Cálculo de preço por unidade/volume/peso
+            preco_unidade_val, preco_unidade_str = calcular_preco_unidade(descricao, preco_total)
+            preco_por_metro_val, preco_por_metro_str = calcular_precos_papel(descricao, preco_total)
+
+            quantidade_dif = p.get('quantidade_unidade_diferente')
+            unidade_sigla = p.get('unidade_sigla')
+            preco_formatado_padrao = formatar_preco_unidade_personalizado(preco_total, quantidade_dif, unidade_sigla)
+
+            if preco_unidade_val is None or preco_unidade_val == float('inf'):
+                preco_unidade_val = preco_total
+                preco_unidade_str = preco_formatado_padrao
+                if not preco_unidade_str:
+                    preco_unidade_str = f"R$ {preco_total:.2f}/un"
+
+            # Atualiza os campos no objeto
+            p['preco_unidade_val'] = preco_unidade_val
+            p['preco_unidade_str'] = preco_unidade_str
+            p['preco_por_metro_val'] = preco_por_metro_val if preco_por_metro_val else float('inf')
+            
+            # Adiciona à lista para exibição
+            produtos_para_exibir.append(p)
         
-        shibata_preco_str_final = f"R$ {item['shibata_preco_val']:.2f}".replace('.', ',') if item['shibata_preco_val'] != float('inf') else "N/D"
-        nagumo_preco_str_final = f"R$ {item['nagumo_preco_val']:.2f}".replace('.', ',') if item['nagumo_preco_val'] != float('inf') else "N/D"
+        # 3. Lógica de exibição (Movida para dentro do 'col_shibata')
+        with col_shibata:
+            st.markdown(f"""
+                <h5 style="display: flex; align-items: center; justify-content: center;">
+                    <img src="{LOGO_SHIBATA_URL}" width="80" alt="Shibata" style="margin-right:8px; background-color: white; border-radius: 4px; padding: 3px;"/>
+                </h5>
+            """, unsafe_allow_html=True)
+            
+            total_encontrado = len(produtos_para_exibir)
+            st.markdown(f"<small>🔎 {total_encontrado} produto(s) encontrado(s).</small>", unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div class='comparison-item'>
-                <div class='price-badge'>
-                    {item['nome']}
-                </div>
-                
-                <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
-                    <img src="{LOGO_SHIBATA_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Shibata: {shibata_preco_str_final}
-                </a>
-                
-                <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
-                    <img src="{LOGO_NAGUMO_URL}" width="20" style="vertical-align: middle; margin-right: 5px;"/> Nagumo: {nagumo_preco_str_final}
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
+            if not produtos_para_exibir:
+                st.warning(f"Nenhum produto encontrado com o ID: {produto_id_input}")
 
-    st.markdown("<h5>Saída JSON (Estrutura Completa)</h5>", unsafe_allow_html=True)
-    st.json(resultados_comparacao)
+            # O loop agora roda 0 ou 1 vez, mantendo sua lógica de exibição
+            for p in produtos_para_exibir:
+                preco = float(p.get('preco') or 0)
+                descricao = p.get('descricao', '')
+                imagem = p.get('imagem', '')
+                id_item = p.get('id', 'N/A') # Este é o ID interno (Ex: 235813)
+
+                em_oferta = p.get('em_oferta', False)
+                oferta_info = p.get('oferta') or {}
+                preco_oferta = oferta_info.get('preco_oferta')
+                preco_antigo = oferta_info.get('preco_antigo')
+
+                imagem_url = f"https://produto-assets-vipcommerce-com-br.br-se1.magaluobjects.com/500x500/{imagem}" if imagem else DEFAULT_IMAGE_URL
+                preco_total = float(preco_oferta) if em_oferta and preco_oferta else preco
+
+                preco_info_extra = ""
+                
+                # ---- LÓGICA DE PREÇO UNITÁRIO (AJUSTADA) ----
+                # Usamos o nome e descrição do *próprio produto* para decidir o que exibir
+                nome_produto_proc = remover_acentos(f"{p.get('nome', '')} {descricao}")
+
+                if 'papel toalha' in nome_produto_proc:
+                    total_folhas, preco_por_folha = calcular_preco_papel_toalha(descricao, preco_total)
+                    if preco_por_folha:
+                        preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>R$ {preco_por_folha:.3f}/folha ({total_folhas} folhas)</div>"
+                elif 'papel higienico' in nome_produto_proc:
+                    preco_por_metro_val, preco_por_metro_str = calcular_precos_papel(descricao, preco_total)
+                    if preco_por_metro_str:
+                        preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>{preco_por_metro_str}</div>"
+
+                if not preco_info_extra:
+                    _, preco_por_unidade_str = calcular_preco_unidade(descricao, preco_total)
+                    if preco_por_unidade_str:
+                        preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>{preco_por_unidade_str}</div>"
+
+                if 'ovo' in nome_produto_proc:
+                    match_ovo = re.search(r'(\d+)\s*(unidades|un|ovos|c/|com)', descricao.lower())
+                    if match_ovo:
+                        qtd_ovos = int(match_ovo.group(1))
+                        if qtd_ovos > 0:
+                            preco_por_ovo = preco_total / qtd_ovos
+                            preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>R$ {preco_por_ovo:.2f}/unidade</div>"
+                    if re.search(r'1\s*d[uú]zia', descricao.lower()):
+                        preco_por_unidade_duzia = preco_total / 12
+                        preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>R$ {preco_por_unidade_duzia:.2f}/unidade (dúzia)</div>"
+                # ---- FIM DA LÓGICA DE PREÇO UNITÁRIO ----
+
+                # Preço (com ou sem oferta)
+                preco_antigo_html = ""
+                if em_oferta and preco_oferta and preco_antigo:
+                    preco_oferta_val = float(preco_oferta)
+                    preco_antigo_val = float(preco_antigo)
+                    desconto = round(100 * (preco_antigo_val - preco_oferta_val) / preco_antigo_val)
+                    preco_html = f"""
+                        <span style='font-weight: bold; font-size: 1rem;'>R$ {preco_oferta_val:.2f}</span>
+                        <span style='color: red; font-weight: bold; font-size: 0.7rem;'> ({desconto}% OFF)</span>
+                    """
+                    preco_antigo_html = f"<span style='text-decoration: line-through; color: gray; font-size: 0.75rem;'>R$ {preco_antigo_val:.2f}</span>"
+                else:
+                    preco_html = f"<span style='font-weight: bold; font-size: 1rem;'>R$ {preco:.2f}</span>"
+
+
+                # --- BLOCO "TODOS OS CAMPOS" (Mantido 100% do seu arquivo) ---
+                campos_excluidos = [
+                    'id', 'descricao', 'nome', 'preco', 'preco_unidade_val', 'preco_unidade_str',
+                    'preco_por_metro_val', 'preco_por_folha_val', 'em_oferta', 'oferta', 'imagem',
+                    'quantidade_unidade_diferente', 'unidade_sigla', 'disponivel'
+                ]
+
+                campos_adicionais_html = ""
+                for key, value in p.items():
+                    if key not in campos_excluidos and value is not None:
+                        if isinstance(value, dict):
+                            detail = ', '.join(f'{k}: {v}' for k, v in value.items() if v is not None)
+                            if detail:
+                                campos_adicionais_html += f"<div>**{key.capitalize()}**: {detail}</div>"
+                        elif isinstance(value, list):
+                            campos_adicionais_html += f"<div>**{key.capitalize()}**: [Lista com {len(value)} item(ns)]</div>"
+                        else:
+                            campos_adicionais_html += f"<div>**{key.capitalize()}**: {value}</div>"
+                
+                # O ID que estávamos usando para buscar (Ex: 16286)
+                # A API retorna esse ID como 'produto_id'
+                produto_id_api = p.get('produto_id', 'N/A') 
+
+                # Se não houver campos adicionais, exibe uma mensagem
+                if not campos_adicionais_html:
+                     campos_adicionais_html = "<div>Nenhum campo adicional encontrado na resposta da API além dos já exibidos.</div>"
+
+                # Estrutura de exibição completa
+                st.markdown(f"""
+                    <div class="product-container">
+                        <div class="product-image">
+                            <img src="{imagem_url}" alt="{p.get('nome', 'Produto')}" style="max-width: 100%; height: auto; border-radius: 4px;">
+                        </div>
+                        <div class="product-info">
+                            <strong>{p.get('nome', 'N/A')}</strong><br>
+                            <span class='info-cinza'>{descricao}</span><br>
+                            {preco_html}
+                            {preco_antigo_html}
+                            {preco_info_extra}
+
+                            <div style="margin-top: 5px; border-top: 1px dashed #eee; padding-top: 5px; font-size: 0.7em;">
+                                <div style="font-weight: bold; color: #333;">TODOS OS CAMPOS DO OBJETO (Possíveis):</div>
+                                <div>**ID (Interno)**: {id_item}</div>
+                                <div>**Produto_id (da URL)**: {produto_id_api}</div>
+                                {campos_adicionais_html}
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="product-separator">
+                """, unsafe_allow_html=True)

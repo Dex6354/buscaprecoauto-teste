@@ -2,18 +2,10 @@ import streamlit as st
 import requests
 import unicodedata
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json # Importação necessária
+from bs4 import BeautifulSoup # Importação necessária (instale com: pip install beautifulsoup4)
 
-# Configurações para Shibata
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
-ORG_ID = "161"
-HEADERS_SHIBATA = {
-    "Authorization": f"Bearer {TOKEN}",
-    "organizationid": ORG_ID,
-    "sessao-id": "4ea572793a132ad95d7e758a4eaf6b09",
-    "domainkey": "loja.shibata.com.br",
-    "User-Agent": "Mozilla/5.0"
-}
+# Configurações para Shibata (TOKEN E HEADERS REMOVIDOS - NÃO SÃO MAIS NECESSÁRIOS)
 
 # Links dos logos
 LOGO_SHIBATA_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-shibata.png" # Logo do Shibata
@@ -118,26 +110,59 @@ def formatar_preco_unidade_personalizado(preco_total, quantidade, unidade):
     else:
         return f"R$ {preco_total:.2f}".replace('.', ',') + f"/{unidade.lower()}"
 
-# --- NOVA FUNÇÃO DE BUSCA POR PRODUTO_ID ---
-def fetch_shibata_product_by_id(produto_id):
-    """Busca um produto específico no Shibata pelo Produto_id."""
+# --- NOVA FUNÇÃO DE BUSCA POR SCRAPING ---
+def fetch_shibata_product_by_scraping(produto_id):
+    """Busca um produto específico no Shibata via scraping da página pública."""
     if not produto_id:
         return None
-    # Este é o endpoint para buscar um produto único pelo ID
-    url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produto/{produto_id}"
+    
+    # Monta a URL pública do produto
+    url = f"https://www.loja.shibata.com.br/produto/{produto_id}"
+    
     try:
-        response = requests.get(url, headers=HEADERS_SHIBATA, timeout=10)
-        if response.status_code == 200:
-            # A API retorna {'data': {'produto': {...}}}
-            return response.json().get('data', {}).get('produto')
-        else:
-            st.error(f"Falha ao buscar Produto_id {produto_id}. Status: {response.status_code}")
+        # Headers de navegador para evitar bloqueios simples
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            st.error(f"Falha ao acessar a página do produto (ID: {produto_id}). Status: {response.status_code}")
             return None
+
+        # Usar BeautifulSoup para parsear o HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Encontrar a tag <script> com id="__NEXT_DATA__"
+        script_tag = soup.find('script', {'id': '__NEXT_DATA__'})
+        
+        if not script_tag:
+            st.error(f"Não foi possível encontrar a tag '__NEXT_DATA__' na página do produto (ID: {produto_id}). O site pode ter mudado.")
+            return None
+
+        # Extrair o conteúdo JSON da tag
+        json_data = json.loads(script_tag.string)
+        
+        # Navegar na estrutura do JSON para encontrar o objeto do produto
+        # O caminho é props -> pageProps -> data -> produto
+        produto_data = json_data.get('props', {}).get('pageProps', {}).get('data', {}).get('produto')
+        
+        if not produto_data:
+            # Pode ser uma página de erro ou "produto não encontrado"
+            st.warning(f"Produto (ID: {produto_id}) não encontrado nos dados da página (__NEXT_DATA__).")
+            return None
+            
+        return produto_data
+
     except requests.exceptions.RequestException as e:
-        st.error(f"Erro de conexão ao buscar Shibata: {e}")
+        st.error(f"Erro de conexão ao raspar o Shibata: {e}")
+        return None
+    except json.JSONDecodeError:
+        st.error("Erro ao decodificar o JSON da tag '__NEXT_DATA__'.")
         return None
     except Exception as e:
-        st.error(f"Erro inesperado ao buscar Shibata: {e}")
+        st.error(f"Erro inesperado no scraping do Shibata: {e}")
         return None
 
 # Configuração da página (Mantida do seu arquivo)
@@ -145,6 +170,7 @@ st.set_page_config(page_title="Preços Mercados", page_icon="🛒", layout="wide
 
 st.markdown("""
     <style>
+        /* Seus estilos CSS permanecem os mesmos */
         .block-container { padding-top: 0rem; }
         footer {visibility: hidden;}
         #MainMenu {visibility: hidden;}
@@ -162,7 +188,7 @@ st.markdown("""
         }
         .product-info {
             flex: 1 1 auto;
-            min-width: 0; /* 👈 ESSENCIAL para permitir quebra */
+            min-width: 0;
             word-break: break-word;
             overflow-wrap: break-word;
         }
@@ -186,25 +212,25 @@ st.markdown("""
             margin-right: auto;
             background: transparent;
             scrollbar-width: thin;
-            scrollbar-color: gray transparent;  /* Firefox: thumb branco, track transparente */
+            scrollbar-color: gray transparent;
         }
         [data-testid="stColumn"]::-webkit-scrollbar {
             width: 6px;
             background: transparent;
         }
         [data-testid="stColumn"]::-webkit-scrollbar-track {
-            background: transparent; /* fundo transparente */
+            background: transparent;
         }
         [data-testid="stColumn"]::-webkit-scrollbar-thumb {
-            background-color: gray; /* barrinha branca translúcida */
+            background-color: gray;
             border-radius: 3px;
             border: 1px solid transparent;
         }
         [data-testid="stColumn"]::-webkit-scrollbar-thumb:hover {
-            background-color: white; /* barrinha mais visível ao passar o mouse */
+            background-color: white;
         }
         .block-container {
-            padding-right: 47px !important;  /* Tamanho do espaco para rolagem */
+            padding-right: 47px !important;
         }
         input[type="text"] {
             font-size: 0.8rem !important;
@@ -222,29 +248,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- ENTRADA MODIFICADA ---
+# --- ENTRADA (Mantida) ---
 st.markdown("<h6>🛒 Preços Mercados (Busca por ID)</h6>", unsafe_allow_html=True)
+st.info("Atenção: A biblioteca BeautifulSoup4 é necessária. Instale com: pip install beautifulsoup4")
 produto_id_input = st.text_input("🔎 Digite o Produto_id (Ex: 16286):", "16286").strip()
 
 
 # --- LÓGICA PRINCIPAL MODIFICADA ---
 if produto_id_input:
-    # Cria a coluna/container
     col_shibata = st.container()
 
-    with st.spinner(f"🔍 Buscando Produto_id {produto_id_input}..."):
-        # 1. Busca o produto único
-        produto_encontrado = fetch_shibata_product_by_id(produto_id_input)
+    with st.spinner(f"🔍 Buscando Produto_id {produto_id_input} na página..."):
+        # 1. Busca o produto único (usando a nova função de scraping)
+        produto_encontrado = fetch_shibata_product_by_scraping(produto_id_input)
         
-        produtos_para_exibir = [] # Usamos uma lista para manter a lógica de loop de exibição
-
+        produtos_para_exibir = []
         if produto_encontrado:
             # 2. Processa o produto (lógica de cálculo de preço do seu arquivo)
             p = produto_encontrado
             
             if not p.get("disponivel", True):
                 st.warning("Produto encontrado, mas está marcado como indisponível.")
-                # Mesmo indisponível, vamos processar para exibir os dados
 
             preco = float(p.get('preco') or 0)
             em_oferta = p.get('em_oferta', False)
@@ -253,7 +277,6 @@ if produto_id_input:
             preco_total = float(preco_oferta) if em_oferta and preco_oferta else preco
             descricao = p.get('descricao', '')
 
-            # Cálculo de preço por unidade/volume/peso
             preco_unidade_val, preco_unidade_str = calcular_preco_unidade(descricao, preco_total)
             preco_por_metro_val, preco_por_metro_str = calcular_precos_papel(descricao, preco_total)
 
@@ -267,15 +290,13 @@ if produto_id_input:
                 if not preco_unidade_str:
                     preco_unidade_str = f"R$ {preco_total:.2f}/un"
 
-            # Atualiza os campos no objeto
             p['preco_unidade_val'] = preco_unidade_val
             p['preco_unidade_str'] = preco_unidade_str
             p['preco_por_metro_val'] = preco_por_metro_val if preco_por_metro_val else float('inf')
             
-            # Adiciona à lista para exibição
             produtos_para_exibir.append(p)
         
-        # 3. Lógica de exibição (Movida para dentro do 'col_shibata')
+        # 3. Lógica de exibição (Exatamente como no seu arquivo)
         with col_shibata:
             st.markdown(f"""
                 <h5 style="display: flex; align-items: center; justify-content: center;">
@@ -289,12 +310,11 @@ if produto_id_input:
             if not produtos_para_exibir:
                 st.warning(f"Nenhum produto encontrado com o ID: {produto_id_input}")
 
-            # O loop agora roda 0 ou 1 vez, mantendo sua lógica de exibição
             for p in produtos_para_exibir:
                 preco = float(p.get('preco') or 0)
                 descricao = p.get('descricao', '')
                 imagem = p.get('imagem', '')
-                id_item = p.get('id', 'N/A') # Este é o ID interno (Ex: 235813)
+                id_item = p.get('id', 'N/A')
 
                 em_oferta = p.get('em_oferta', False)
                 oferta_info = p.get('oferta') or {}
@@ -306,8 +326,6 @@ if produto_id_input:
 
                 preco_info_extra = ""
                 
-                # ---- LÓGICA DE PREÇO UNITÁRIO (AJUSTADA) ----
-                # Usamos o nome e descrição do *próprio produto* para decidir o que exibir
                 nome_produto_proc = remover_acentos(f"{p.get('nome', '')} {descricao}")
 
                 if 'papel toalha' in nome_produto_proc:
@@ -334,9 +352,7 @@ if produto_id_input:
                     if re.search(r'1\s*d[uú]zia', descricao.lower()):
                         preco_por_unidade_duzia = preco_total / 12
                         preco_info_extra += f"<div style='color:gray; font-size:0.75em;'>R$ {preco_por_unidade_duzia:.2f}/unidade (dúzia)</div>"
-                # ---- FIM DA LÓGICA DE PREÇO UNITÁRIO ----
 
-                # Preço (com ou sem oferta)
                 preco_antigo_html = ""
                 if em_oferta and preco_oferta and preco_antigo:
                     preco_oferta_val = float(preco_oferta)
@@ -350,8 +366,6 @@ if produto_id_input:
                 else:
                     preco_html = f"<span style='font-weight: bold; font-size: 1rem;'>R$ {preco:.2f}</span>"
 
-
-                # --- BLOCO "TODOS OS CAMPOS" (Mantido 100% do seu arquivo) ---
                 campos_excluidos = [
                     'id', 'descricao', 'nome', 'preco', 'preco_unidade_val', 'preco_unidade_str',
                     'preco_por_metro_val', 'preco_por_folha_val', 'em_oferta', 'oferta', 'imagem',
@@ -370,15 +384,11 @@ if produto_id_input:
                         else:
                             campos_adicionais_html += f"<div>**{key.capitalize()}**: {value}</div>"
                 
-                # O ID que estávamos usando para buscar (Ex: 16286)
-                # A API retorna esse ID como 'produto_id'
                 produto_id_api = p.get('produto_id', 'N/A') 
 
-                # Se não houver campos adicionais, exibe uma mensagem
                 if not campos_adicionais_html:
                      campos_adicionais_html = "<div>Nenhum campo adicional encontrado na resposta da API além dos já exibidos.</div>"
 
-                # Estrutura de exibição completa
                 st.markdown(f"""
                     <div class="product-container">
                         <div class="product-image">

@@ -54,8 +54,8 @@ def extrair_termos_busca(nome_completo):
     nome_sem_preco = re.sub(r'\sR\$\d+(?:[.,]\d+)?', '', nome_completo, flags=re.IGNORECASE).strip()
     return nome_sem_preco # Retorna o nome de exibição
 
-def extract_shibata_id(url):
-    """Extrai o ID do produto da URL do Shibata."""
+def extract_shibata_produto_id(url):
+    """Extrai o Produto_id do produto da URL do Shibata."""
     match = re.search(r'/produto/(\d+)/', url)
     return match.group(1) if match else None
 
@@ -70,12 +70,12 @@ def extract_nagumo_sku(url):
 # NOVAS FUNÇÕES DE BUSCA DIRETA POR ID/SKU
 # ----------------------------------------------------------------------
 
-def fetch_shibata_product(product_id):
-    """Busca um produto específico no Shibata pelo ID."""
-    if not product_id:
+def fetch_shibata_product(produto_id):
+    """Busca um produto específico no Shibata pelo Produto_id."""
+    if not produto_id:
         return None
-    # Endpoint de busca direta por ID (assumindo padrão RESTful)
-    url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produto/{product_id}"
+    # Endpoint de busca direta por Produto_id
+    url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produto/{produto_id}"
     try:
         response = requests.get(url, headers=HEADERS_SHIBATA, timeout=10)
         if response.status_code == 200:
@@ -260,10 +260,10 @@ def realizar_comparacao_automatica():
     for item in lista_itens:
         nome_exibicao = extrair_termos_busca(item['nome'])
         
-        shibata_id = extract_shibata_id(item['shibata'])
+        shibata_produto_id = extract_shibata_produto_id(item['shibata'])
         nagumo_sku = extract_nagumo_sku(item['nagumo'])
 
-        shibata_produto = fetch_shibata_product(shibata_id)
+        shibata_produto = fetch_shibata_product(shibata_produto_id)
         nagumo_produto = fetch_nagumo_product(nagumo_sku)
 
         # 1. Processamento Shibata

@@ -724,7 +724,6 @@ if resultados_comparacao:
         # *** NOVO: Combina o NOME ORIGINAL COMPLETO do JSON e o melhor preço
         nome_original = item['nome_original_completo']
         preco_destaque = item['preco_principal_str']
-        titulo_completo = f"{nome_original} ({preco_destaque})"
         
         # URL da Imagem
         img_src = item.get('imagem_principal', DEFAULT_IMAGE_URL)

@@ -659,21 +659,21 @@ st.markdown("""
         }
         .price-badge {
             grid-area: title;
-            font-weight: bold;
-            font-size: 1.1em;
-            align-self: end; /* Alinha o título na base da sua célula */
+            font-weight: normal; /* AJUSTE: Nome do produto normal */
+            font-size: 1.15em; /* AJUSTE: Tamanho maior para o nome */
+            align-self: end; 
             padding-bottom: 2px;
-            line-height: 1.2; /* Ajusta a altura da linha */
+            line-height: 1.2; 
         }
         .market-link {
             text-decoration: none;
             display: block;
             padding: 2px 0;
-            align-self: start; /* Alinha os links no topo de suas células */
-            font-size: 0.9em; /* Ajuste para melhor visualização */
-            white-space: nowrap; /* Evita quebras de linha indesejadas */
-            overflow: hidden; /* Esconde o excesso se houver */
-            text-overflow: ellipsis; /* Adiciona "..." se o texto for cortado */
+            align-self: start; 
+            font-size: 0.9em; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
         }
         .shibata-link { 
             grid-area: shibata;
@@ -686,7 +686,7 @@ st.markdown("""
         .logo-pequeno {
             vertical-align: middle; 
             margin-right: 5px;
-            height: 16px; /* Tamanho do logo ajustado */
+            height: 16px; 
             width: auto;
         }
     </style>
@@ -725,22 +725,24 @@ if resultados_comparacao:
         shibata_preco_str_final = item['shibata_preco_str'] if shibata_disponivel else "N/D"
         nagumo_preco_str_final = item['nagumo_preco_str'] if nagumo_disponivel else "N/D"
         
-        # Título principal formatado
-        titulo_principal = f"{item['nome_exibicao']} ({item['preco_principal_str']})"
+        # O nome original completo (item['nome_exibicao']) será o título principal, e o preço principal destacado
+        nome_original = item['nome_exibicao']
+        preco_destaque = item['preco_principal_str']
         
         # URL da Imagem
         img_src = item.get('imagem_principal', DEFAULT_IMAGE_URL)
         if not img_src:
              img_src = DEFAULT_IMAGE_URL
 
-        # Bloco HTML corrigido (sem indentação após a primeira aspas)
+        # Bloco HTML corrigido (COM A MUDANÇA SOLICITADA)
         st.markdown(f"""
 <div class='comparison-item'>
 <div>
-    <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
+    <img src="{img_src}" class='product-image' alt="{nome_original}" />
     </div>
     <div class='price-badge'>
-    <strong>{titulo_principal}</strong><br>
+    {nome_original}<br>
+    <strong>{preco_destaque}</strong>
     </div>
     <div>
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">

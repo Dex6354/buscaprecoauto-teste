@@ -736,8 +736,9 @@ if resultados_comparacao:
         # Bloco HTML corrigido (sem indentação após a primeira aspas)
         st.markdown(f"""
 <div class='comparison-item'>
+<div>
     <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
-    
+    </div>
     <div class='price-badge'>
     <strong>{titulo_principal}</strong><br>
     </div>

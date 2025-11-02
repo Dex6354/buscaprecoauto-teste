@@ -811,17 +811,16 @@ st.markdown("""
         .main-comparison-box {
             border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 0; 
+            padding: 0; /* Remove o padding, pois os itens já têm o seu */
             margin-bottom: 20px;
-            background-color: white; /* AGORA O FUNDO BRANCO É A LINHA DIVISÓRIA */
+            background-color: #f9f9f9; /* Fundo leve para o box */
         }
 
         .comparison-item {
-            background-color: #f9f9f9; /* NOVO: Cor de fundo do item */
             border: none; /* Removido a borda do item individual */
-            border-bottom: none; /* Remove a linha divisória de borda */
+            border-bottom: 1px solid white; /* NOVO: Linha divisória branca */
             padding: 10px;
-            margin-bottom: 2px; /* NOVO: Margem para criar a linha divisória branca */
+            margin-bottom: 0; /* Removido o margin-bottom */
             display: grid; /* Usa grid */
             grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
             grid-template-rows: auto auto auto; /* 3 linhas */
@@ -834,9 +833,9 @@ st.markdown("""
             overflow: hidden; 
         }
         
-        /* Garante que o último item não tenha a margem extra na parte inferior */
+        /* Garante que o último item não tenha a linha branca */
         .comparison-item:last-child {
-            margin-bottom: 0; 
+            border-bottom: none; 
         }
 
         .product-image {

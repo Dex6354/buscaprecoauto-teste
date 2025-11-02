@@ -68,7 +68,7 @@
     ]
   },
   {
-    "nome": "🍚 Arroz Camil R$16,50",
+    "nome": "🍚 Arroz Camil R$3,30",
     "nagumo": [
       "https://www.nagumo.com/p/293303",
       "https://www.nagumo.com/p/122238"
@@ -80,7 +80,7 @@
     ]
   },
   {
-    "nome": "🫒 Azeitona 150g R$6,90",
+    "nome": "🫒 Azeitona R$23",
     "nagumo": [],
     "shibata": [
       "https://www.loja.shibata.com.br/produto/7977/azeitona-verde-em-conserva-fatiada-rivoli-sache-peso-liquido-300g-peso-drenado-150g",
@@ -109,9 +109,14 @@
     ]
   },
   {
-    "nome": "🍟 Batata frita Uni 1kg R$14,90",
-    "nagumo": [],
-    "shibata": []
+    "nome": "🍟 Batata frita R$9,95",
+    "nagumo": [
+      "https://www.nagumo.com/p/518260"
+    ],
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/22663/batata-palito-tradicional-uni-sabor-pacote-2kg",
+      "https://www.loja.shibata.com.br/produto/38826/batata-palito-tradicional-congelada-uni-sabor-pacote-105kg"
+    ]
   },
   {
     "nome": "🍟 Batata palha 200g R$9,90",

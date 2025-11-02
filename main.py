@@ -818,7 +818,7 @@ st.markdown("""
 
         .comparison-item {
             border: none; /* Removido a borda do item individual */
-            border-bottom: 1px solid red; /* AJUSTADO: Linha divisória vermelha */
+            border-bottom: 10px solid red; /* AJUSTADO: Linha divisória vermelha */
             padding: 10px;
             margin-bottom: 0; /* Removido o margin-bottom */
             display: grid; /* Usa grid */

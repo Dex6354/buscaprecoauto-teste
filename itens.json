@@ -29,14 +29,27 @@
     ]
   },
   {
-    "nome": "🥬 Alface",
+    "nome": "🥬 Alface R$2,79",
     "nagumo": [],
-    "shibata": []
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/23006/alface-crespa-1-unidade",
+      "https://www.loja.shibata.com.br/produto/21693/alface-crespa-hidroponica-yamakawa-1-unidade"
+    ]
   },
   {
-    "nome": "🧄 Alho kg R$16,90",
-    "nagumo": [],
-    "shibata": []
+    "nome": "🧄 Alho kg R$15,49",
+    "nagumo": [
+      "https://www.nagumo.com/p/577052",
+      "https://www.nagumo.com/p/266005",
+      "https://www.nagumo.com/p/577069",
+      "https://www.nagumo.com/p/266006",
+      "https://www.nagumo.com/p/577076"
+    ],
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/24725/alho-triturado-uni-sabor-pote-1kg",
+      "https://www.loja.shibata.com.br/produto/24710/alho-triturado-uni-sabor-pote-200g",
+      "https://www.loja.shibata.com.br/produto/18810/alho-e-cebola-uni-sabor-pote-200g"
+    ]
   },
   {
     "nome": "🧼 Amaciante 1l R$17,27",

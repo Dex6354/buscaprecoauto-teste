@@ -634,8 +634,8 @@ st.markdown("""
         .comparison-item {
             border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 5px;
-            margin-bottom: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
             display: grid; /* Usa grid */
             grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
             grid-template-rows: auto auto auto; /* 3 linhas */

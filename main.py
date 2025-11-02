@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # CONSTANTES GLOBAIS
 # ----------------------------------------------------------------------
 JSON_FILE = "itens.json" # Define o nome do arquivo JSON
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ0NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
     "Authorization": f"Bearer {TOKEN}",
@@ -818,8 +818,7 @@ st.markdown("""
 
         .comparison-item {
             border: none; /* Removido a borda do item individual */
-            /* *** MUDANÇA AQUI: Adiciona um separador cinza suave visível *** */
-            border-bottom: 1px solid #eee; 
+            border-bottom: 1px solid red; /* AJUSTADO: Linha divisória vermelha */
             padding: 10px;
             margin-bottom: 0; /* Removido o margin-bottom */
             display: grid; /* Usa grid */
@@ -834,7 +833,7 @@ st.markdown("""
             overflow: hidden; 
         }
         
-        /* Garante que o último item não tenha o separador */
+        /* Garante que o último item não tenha a linha vermelha */
         .comparison-item:last-child {
             border-bottom: none; 
         }

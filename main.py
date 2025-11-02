@@ -743,10 +743,10 @@ if resultados_comparacao:
         
 
 <img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white;display: inline-block;
-  padding: 4px 20px;       
+  padding: 1px 1px;       
   border-radius: 6px;        
   overflow: hidden;          
-  height: 50px;" alt="Logo Shibata"/> Shibata: {shibata_preco_str_final}
+  height: 40px;" alt="Logo Shibata"/> Shibata: {shibata_preco_str_final}
     </a>
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' alt="Logo Nagumo"/> Nagumo: {nagumo_preco_str_final}

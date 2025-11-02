@@ -680,10 +680,11 @@ st.markdown("""
         }
         .logo-pequeno {
             vertical-align: middle; 
-            margin-right: 5px;
+            margin-right: 1px;
             height: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
             width: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
             object-fit: contain;
+            border-radius: 6px;
         }
     </style>
 """, unsafe_allow_html=True)

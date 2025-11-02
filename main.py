@@ -889,7 +889,7 @@ resultados_comparacao = st.session_state.resultados_comparacao
 
 if resultados_comparacao:
     
-    # Adicionar o campo de pesquisa (filtro)
+    # Adicionar o campo de pesquisa (filtro) - JÁ ESTÁ RÁPIDO POIS FILTRA APENAS A LISTA NA MEMÓRIA
     termo_pesquisa = st.text_input("", placeholder="🔎 Digite o nome do produto...", label_visibility="collapsed")
     
     resultados_filtrados = []

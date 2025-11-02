@@ -24,7 +24,7 @@ LOGO_SHIBATA_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-sh
 LOGO_NAGUMO_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/logo-nagumo2.png"
 DEFAULT_IMAGE_URL = "https://rawcdn.githack.com/gymbr/precosmercados/main/sem-imagem.png"
 # URL base para a imagem do Shibata
-SHIBATA_IMAGE_BASE_URL = "https://produto-assets-vipcommerce-com-br.br-se1.magaluobjects.com/250x250/"
+SHIBATA_IMAGE_BASE_URL = "https://produto-assets-vipcommerce-com-br.br-se1.magaluobjects.com/500x500/"
 
 
 # ----------------------------------------------------------------------

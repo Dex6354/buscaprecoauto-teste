@@ -733,8 +733,14 @@ if resultados_comparacao:
         if not img_src:
              img_src = DEFAULT_IMAGE_URL
 
-        # Bloco HTML corrigido (sem indentação após a primeira aspas)
-        st.markdown(f"""
+        # ==================================================================
+        # INÍCIO DA CORREÇÃO
+        # ==================================================================
+        # O problema é a indentação do Python sendo incluída na string f-string.
+        # O bloco HTML (de <div até </div>) DEVE começar na coluna 0 (sem indentação)
+        # para que o st.markdown não o trate como um bloco de código.
+        
+        html_output = f"""
 <div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
     
@@ -750,7 +756,14 @@ if resultados_comparacao:
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' alt="Logo Nagumo"/> Nagumo: {nagumo_preco_str_final}
     </a>
 </div>
-""", unsafe_allow_html=True)
+"""
+        # Note que a variável html_output está sendo criada alinhada à esquerda (coluna 0)
+        # e então passada para o st.markdown.
+        
+        st.markdown(html_output, unsafe_allow_html=True)
+        # ==================================================================
+        # FIM DA CORREÇÃO
+        # ==================================================================
 
     st.markdown("<h5>Saída JSON (Estrutura Completa)</h5>", unsafe_allow_html=True)
     st.json(resultados_comparacao)

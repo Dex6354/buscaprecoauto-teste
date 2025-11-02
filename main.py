@@ -670,7 +670,7 @@ st.markdown("""
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            color: red; /* Define a cor vermelha para todos os links */
+            color: red; /* CORREÇÃO: Define a cor vermelha para todos os links, conforme solicitado */
         }
         .shibata-link { 
             grid-area: shibata;
@@ -678,27 +678,12 @@ st.markdown("""
         .nagumo-link { 
             grid-area: nagumo;
         }
-        .logo-pequeno-shibata {
+        .logo-pequeno {
             vertical-align: middle; 
             margin-right: 5px;
-            height: 22px; /* Tamanho do logo */
-            width: 60px; /* Tamanho do logo */
+            height: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
+            width: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
             object-fit: contain;
-            background-color: white; /* Fundo branco para o logo Shibata (transparente com letras escuras) */
-            padding: 2px 2px;       
-            border-radius: 6px;        
-            overflow: hidden;          
-        }
-        .logo-pequeno-nagumo {
-            vertical-align: middle; 
-            margin-right: 5px;
-            height: 22px; /* Tamanho do logo */
-            width: 60px; /* Tamanho do logo */
-            object-fit: contain;
-            /* Fundo branco removido */
-            padding: 2px 2px;       
-            border-radius: 6px; /* Borda arredondada mantida */      
-            overflow: hidden; 
         }
     </style>
 """, unsafe_allow_html=True)
@@ -729,7 +714,8 @@ if resultados_comparacao:
             is_shibata_melhor = False # Ambos indisponíveis, não há melhor
 
         
-        # Aplica font-weight: bold para destacar o melhor preço
+        # CORREÇÃO: A cor vermelha agora é definida na classe CSS .market-link.
+        # Mantive a lógica de 'font-weight: bold' para destacar o melhor preço, mas usei o vermelho fixo.
         shibata_link_style = "font-weight: bold;" if is_shibata_melhor and shibata_disponivel else ""
         nagumo_link_style = "font-weight: bold;" if not is_shibata_melhor and nagumo_disponivel else ""
         
@@ -737,7 +723,7 @@ if resultados_comparacao:
         shibata_preco_str_final = item['shibata_preco_str'] if shibata_disponivel else "N/D"
         nagumo_preco_str_final = item['nagumo_preco_str'] if nagumo_disponivel else "N/D"
         
-        # Nome original e preço em destaque
+        # *** NOVO: Combina o NOME ORIGINAL COMPLETO do JSON e o melhor preço
         nome_original = item['nome_original_completo']
         preco_destaque = item['preco_principal_str']
         
@@ -746,7 +732,7 @@ if resultados_comparacao:
         if not img_src:
              img_src = DEFAULT_IMAGE_URL
 
-        # Bloco HTML CORRIGIDO: Usando as classes específicas para o logo de cada mercado.
+        # Bloco HTML CORRIGIDO: Adicionei estilo inline para o fundo branco do Shibata e apliquei os estilos de link.
         st.markdown(f"""
 <div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{nome_original}" />
@@ -754,10 +740,18 @@ if resultados_comparacao:
     <span style="font-weight: bold; font-size: 1.15em; line-height: 1.2;">{nome_original}</span>
     </div>
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
-        <img src="{LOGO_SHIBATA_URL}" class='logo-pequeno-shibata' alt="Logo Shibata"/> {shibata_preco_str_final}
+<img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white;
+  padding: 2px 2px;       
+  border-radius: 6px;        
+  overflow: hidden;          
+  height: 22px;" alt="Logo Shibata"/> {shibata_preco_str_final}
     </a>
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
-        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno-nagumo' alt="Logo Nagumo"/> {nagumo_preco_str_final}
+        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white;
+  padding: 2px 2px;       
+  border-radius: 6px;        
+  overflow: hidden;          
+  height: 22px;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
     </a>
 </div>
 """, unsafe_allow_html=True)

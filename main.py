@@ -739,7 +739,7 @@ if resultados_comparacao:
 <div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{nome_original}" />
     <div class='price-badge'>
-    <span style="font-weight: bold; font-size: 1.05em; line-height: 1.2;">{nome_original}</span><br>
+    <span style="font-weight: bold; font-size: 1.05em; line-height: 1.2;">{nome_completo}</span><br>
     <span style="font-weight: bold; font-size: 1.15em; color: green; line-height: 1.2;">{preco_destaque}</span>
     </div>
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">

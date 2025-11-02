@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # CONSTANTES GLOBAIS
 # ----------------------------------------------------------------------
 JSON_FILE = "itens.json" # Define o nome do arquivo JSON
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ0ODZlNS1kY2E5LTExZTktODc0Mi0wMjBkNzkzNTljYTAiLCJ2aXBjb21tZXJjZUNsaWVudGVJZCI6bnVsbCwiaWF0IjoxNzUxOTI0OTI4LCJ2ZXIiOjEsImNsaWVudCI6bnVsbCwib3BlcmF0b3IiOm51bGwsIm9yZyI6IjE2MSJ9.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
     "Authorization": f"Bearer {TOKEN}",
@@ -643,7 +643,7 @@ st.markdown("""
                 "image title"
                 "image shibata"
                 "image nagumo";
-            gap: 1px 10px; /* *** AJUSTADO: 1px gap linha para diminuir o espaço, 10px gap coluna */
+            gap: 2px 10px; /* 2px gap linha, 10px gap coluna */
             min-height: 90px; 
             overflow: hidden; 
         }
@@ -732,7 +732,7 @@ if resultados_comparacao:
         if not img_src:
              img_src = DEFAULT_IMAGE_URL
 
-        # Bloco HTML CORRIGIDO: Adicionei estilo inline para o fundo branco e border-radius no Nagumo.
+        # Bloco HTML CORRIGIDO: Adicionei estilo inline para o fundo branco do Shibata e apliquei os estilos de link.
         st.markdown(f"""
 <div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{nome_original}" />
@@ -747,11 +747,7 @@ if resultados_comparacao:
   height: 22px;" alt="Logo Shibata"/> {shibata_preco_str_final}
     </a>
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
-        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white;
-  padding: 2px 2px;       
-  border-radius: 6px;        
-  overflow: hidden;          
-  height: 22px;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
+        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' alt="Logo Nagumo"/> {nagumo_preco_str_final}
     </a>
 </div>
 """, unsafe_allow_html=True)

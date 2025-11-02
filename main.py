@@ -688,11 +688,14 @@ def realizar_comparacao_automatica():
             except Exception as exc:
                 # Captura e loga erros que ocorreram na thread
                 # st.error(f'Um item gerou uma exceção: {exc}') # Removido para evitar poluição no Streamlit
-
+                pass # Garante que o bloco 'except' não está vazio, evitando IndentationError na linha seguinte
+                
     # --- Lógica de Ordenação AJUSTADA ---
     # Prioridade 1: O menor preço unitário do item é menor ou igual ao preço de referência (COR VERDE)
     # Prioridade 2: Ordenação crescente pelo menor preço unitário.
     # Prioridade 3 (NOVO): Ordem alfabética pelo nome de exibição.
+    
+    # *** CORREÇÃO DE INDENTAÇÃO: O código de ordenação deve estar no mesmo nível do 'with' ***
     
     def chave_ordenacao(item):
         shibata_val = item['shibata_preco_val']

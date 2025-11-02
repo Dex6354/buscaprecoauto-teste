@@ -681,8 +681,8 @@ st.markdown("""
         .logo-pequeno {
             vertical-align: middle; 
             margin-right: 5px;
-            height: 30px; /* CORREÇÃO: Tamanho dos logos unificado */
-            width: 30px; /* CORREÇÃO: Tamanho dos logos unificado */
+            height: 100px; /* CORREÇÃO: Tamanho dos logos unificado */
+            width: 100px; /* CORREÇÃO: Tamanho dos logos unificado */
             object-fit: contain;
         }
     </style>

@@ -735,12 +735,11 @@ if resultados_comparacao:
 
         # Bloco HTML corrigido (sem indentação após a primeira aspas)
         st.markdown(f"""
-<div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 0rem; flex-wrap: wrap;">
-                    <div style="flex: 0 0 auto;">
+<div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
-    </div>
-    <div style="flex: 1; word-break: break-word; overflow-wrap: anywhere;">
-        <strong>{titulo_principal}</strong><br>
+    
+    <div class='price-badge'>
+    <strong>{titulo_principal}</strong><br>
     </div>
     
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">

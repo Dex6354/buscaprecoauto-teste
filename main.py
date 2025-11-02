@@ -736,14 +736,11 @@ if resultados_comparacao:
         # ==================================================================
         # INÍCIO DA CORREÇÃO
         # ==================================================================
-        # O problema é a indentação do Python sendo incluída na string f-string.
-        # O bloco HTML (de <div até </div>) DEVE começar na coluna 0 (sem indentação)
-        # para que o st.markdown não o trate como um bloco de código.
+        # O problema era a nova linha ( \n ) entre f""" e <div...
+        # A string deve começar com <div na MESMA linha do f""".
         
-        # Criamos a string HTML em uma variável separada, garantindo que ela 
-        # comece na coluna 0 (sem espaços à esquerda).
-        html_output = f"""
-<div class='comparison-item'>
+        # Note que f"""<div... está tudo na mesma linha inicial.
+        html_output = f"""<div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
     
     <div class='price-badge'>
@@ -757,10 +754,9 @@ if resultados_comparacao:
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' alt="Logo Nagumo"/> Nagumo: {nagumo_preco_str_final}
     </a>
-</div>
-"""
-        # Agora passamos a variável 'html_output' (que não tem indentação)
-        # para o st.markdown.
+</div>"""
+        
+        # Agora passamos a variável 'html_output' (que começa com <div...)
         st.markdown(html_output, unsafe_allow_html=True)
         # ==================================================================
         # FIM DA CORREÇÃO

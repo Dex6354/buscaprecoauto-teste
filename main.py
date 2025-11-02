@@ -385,7 +385,7 @@ def buscar_detalhes_nagumo_por_sku(sku):
         return None
 
 # ----------------------------------------------------------------------
-# FUNÇÕES DE PROCESSAMENTO PARA OBTENÇÃO DO MELHOR PREÇO UNITÁRIO (MANTIDAS)
+# FUNÇÕES DE PROCESSAMENTO PARA OBTENÇÃO DO MELHOR PREÇO UNITÁRIO (AJUSTADAS)
 # ----------------------------------------------------------------------
 
 def obter_melhor_preco_shibata(produtos_ordenados):
@@ -463,7 +463,6 @@ def obter_melhor_preco_nagumo(produtos_ordenados):
 def processar_item(item):
     """
     Processa um único item do JSON, realizando as buscas no Shibata e Nagumo.
-    *** AJUSTADO para lidar com múltiplos links e armazenar todos os resultados ***
     """
     # Extrai o nome de exibição do JSON
     nome_completo = item['nome']
@@ -476,13 +475,12 @@ def processar_item(item):
     # 1. Busca e Processamento Shibata (POR ID) - AJUSTADO PARA LIDAR COM LISTA
     # ----------------------------------------------------------------------
     produtos_shibata_processados = []
-    shibata_urls_raw = item.get('shibata', []) 
+    shibata_urls = item.get('shibata', []) # Pega o valor (string ou lista)
     
-    # Converte para lista de URLs (suporta string ou lista)
-    if isinstance(shibata_urls_raw, str):
-        shibata_urls = [shibata_urls_raw] if shibata_urls_raw else []
-    else:
-        shibata_urls = shibata_urls_raw or []
+    # *** NOVO: Trata se for string (legado) ou lista ***
+    if isinstance(shibata_urls, str):
+        shibata_urls = [shibata_urls] if shibata_urls else []
+    # ****************************************************
     
     shibata_imagem_url = None
     
@@ -501,7 +499,7 @@ def processar_item(item):
                 em_oferta = p.get('em_oferta', False)
                 preco_oferta = p.get('preco_oferta')
                 
-                # *** LÓGICA DE IMAGEM SHIBATA ***
+                # *** NOVA LÓGICA DE IMAGEM SHIBATA ***
                 imagem_nome = p.get('imagem')
                 if imagem_nome and not shibata_imagem_url: # Pega a primeira imagem válida
                     shibata_imagem_url = f"{SHIBATA_IMAGE_BASE_URL}{imagem_nome}"
@@ -520,7 +518,7 @@ def processar_item(item):
                 
                 preco_unidade_str = formatar_preco_unidade_personalizado(preco_total, quantidade_dif, unidade_sigla)
                 
-                # --- Lógica de cálculo de preço unitário ---
+                # --- Lógica de cálculo de preço unitário (mantida) ---
                 descricao_limpa = descricao.lower().replace('grande', '').strip()
                 
                 preco_unidade_val, preco_un_str_papel = calcular_precos_papel(descricao, preco_total)
@@ -561,25 +559,24 @@ def processar_item(item):
                 
                 p['preco_unidade_val'] = preco_unidade_val
                 p['preco_unidade_str'] = preco_unidade_str 
-                p['imagem_url'] = shibata_imagem_url # Armazena a URL da imagem no produto (o primeiro válido)
-                p['source_url'] = shibata_url # <<< Armazena a URL de origem
+                p['imagem_url'] = shibata_imagem_url # Armazena a URL da imagem no produto
+                
+                # --- Fim da lógica de cálculo ---
                 
                 produtos_shibata_processados.append(p)
-    
-    # Ordena todos os produtos encontrados para que o primeiro seja o melhor (para a comparação)
+    # Ordena todos os produtos encontrados para pegar o melhor preço
     produtos_shibata_ordenados = sorted(produtos_shibata_processados, key=lambda x: x['preco_unidade_val'])
 
     # ----------------------------------------------------------------------
     # 2. Busca e Processamento Nagumo (POR SKU) - AJUSTADO PARA LIDAR COM LISTA
     # ----------------------------------------------------------------------
     produtos_nagumo_processados = []
-    nagumo_urls_raw = item.get('nagumo', [])
+    nagumo_urls = item.get('nagumo', [])
     
-    # Converte para lista de URLs (suporta string ou lista)
-    if isinstance(nagumo_urls_raw, str):
-        nagumo_urls = [nagumo_urls_raw] if nagumo_urls_raw else []
-    else:
-        nagumo_urls = nagumo_urls_raw or []
+    # *** NOVO: Trata se for string (legado) ou lista ***
+    if isinstance(nagumo_urls, str):
+        nagumo_urls = [nagumo_urls] if nagumo_urls else []
+    # ****************************************************
     
     nagumo_imagem_url = None
     
@@ -610,58 +607,69 @@ def processar_item(item):
 
                 produto['preco_unitario_str'] = calcular_preco_unitario_nagumo(preco_exibir, produto.get('description', ''), produto['name'], produto.get("unit"))
                 produto['preco_unitario_valor'] = extrair_valor_unitario(produto['preco_unitario_str'])
-                produto['source_url'] = nagumo_url # <<< Armazena a URL de origem
                 
                 produtos_nagumo_processados.append(produto)
 
-    # Ordena todos os produtos encontrados para que o primeiro seja o melhor (para a comparação)
     produtos_nagumo_ordenados = sorted(produtos_nagumo_processados, key=lambda x: x['preco_unitario_valor'])
 
     # ----------------------------------------------------------------------
     # 3. Formata os Resultados Finais
     # ----------------------------------------------------------------------
     
-    # Obtém o melhor preço GERAL para a lógica de ordenação e comparação principal
     preco_shibata_val, preco_shibata_str, shibata_total_val = obter_melhor_preco_shibata(produtos_shibata_ordenados)
     preco_nagumo_val, preco_nagumo_str, nagumo_total_val = obter_melhor_preco_nagumo(produtos_nagumo_ordenados)
 
-    # Determina a imagem principal
+    # Determina o preço mais baixo e a imagem principal
+    preco_principal_str = "N/D"
     imagem_principal = DEFAULT_IMAGE_URL
+
+    is_shibata_melhor = preco_shibata_val <= preco_nagumo_val and preco_shibata_val != float('inf')
+    is_nagumo_melhor = preco_nagumo_val < preco_shibata_val and preco_nagumo_val != float('inf')
+    
+    # *** LÓGICA DE PRIORIDADE DE IMAGEM ***
     if produtos_shibata_ordenados and produtos_shibata_ordenados[0].get('imagem_url'):
         imagem_principal = produtos_shibata_ordenados[0]['imagem_url']
     elif nagumo_imagem_url:
         imagem_principal = nagumo_imagem_url
+    # **********************************************
 
-    # Determina o preço principal (apenas para o campo de ordenação, não é mais exibido diretamente)
-    is_shibata_melhor = preco_shibata_val <= preco_nagumo_val and preco_shibata_val != float('inf')
-    is_nagumo_melhor = preco_nagumo_val < preco_shibata_val and preco_nagumo_val != float('inf')
-    
     if is_shibata_melhor:
         preco_principal_str = preco_shibata_str
+        
     elif is_nagumo_melhor:
         preco_principal_str = preco_nagumo_str
+        
     else:
-        preco_principal_str = "N/D"
+        # Fallback (Nenhum preço é válido ou estão empatados e indisponíveis)
+        if preco_shibata_str != "Preço indisponível":
+            preco_principal_str = preco_shibata_str
+        elif preco_nagumo_str != "Preço indisponível":
+            preco_principal_str = preco_nagumo_str
 
+    # *** NOVO: Formata a string do preço total ***
+    shibata_total_str = f"{shibata_total_val:.2f}".replace('.', ',') if shibata_total_val != float('inf') and shibata_total_val > 0 else "N/D"
+    nagumo_total_str = f"{nagumo_total_val:.2f}".replace('.', ',') if nagumo_total_val != float('inf') and nagumo_total_val > 0 else "N/D"
+    
     # Monta o objeto final
     resultado = {
-        "nome_original_completo": item['nome'],
+        "nome_original_completo": item['nome'], # <-- NOME COMPLETO DO JSON
         "nome_exibicao": nome_exibicao,
         "preco_principal_str": preco_principal_str,
         "imagem_principal": imagem_principal,
-        
-        # *** NOVO: Armazena a lista COMPLETA de produtos processados para exibição ***
-        "shibata_produtos_detalhes": produtos_shibata_ordenados, 
-        "nagumo_produtos_detalhes": produtos_nagumo_ordenados,   
-        
-        # Valores unitários do melhor preço (para a ordenação GERAL)
+        # Guarda as URLs como string para exibição/links
+        "nagumo": str(item.get('nagumo', '')), 
+        "shibata": str(item.get('shibata', '')), 
         "shibata_preco_val": preco_shibata_val,
         "nagumo_preco_val": preco_nagumo_val,
+        "shibata_preco_str": preco_shibata_str, 
+        "nagumo_preco_str": preco_nagumo_str,
+        # *** NOVO: Adiciona a referência de preço do JSON
         "preco_referencia_nome": preco_referencia_nome,
-        
-        # Os campos 'shibata' e 'nagumo' não são mais usados no HTML de exibição
-        "shibata": "",
-        "nagumo": "",
+        # *** NOVO: Adiciona os preços totais
+        "shibata_total_val": shibata_total_val,
+        "nagumo_total_val": nagumo_total_val,
+        "shibata_total_str": shibata_total_str,
+        "nagumo_total_str": nagumo_total_str,
     }
     
     return resultado
@@ -711,6 +719,7 @@ def realizar_comparacao_automatica():
         # *** AJUSTE CRÍTICO: Limpeza de nome para ordenação alfabética (remove emojis/símbolos) ***
         nome_para_ordenacao = remover_acentos(item['nome_exibicao'])
         # Remove caracteres que não são alfanuméricos, espaços, hífens ou barras
+        # Isso garante que a ordenação seja estritamente alfabética, ignorando emojis.
         nome = re.sub(r'[^\w\s\-\/]', '', nome_para_ordenacao).strip()
         # ****************************************************************************************
         
@@ -740,7 +749,7 @@ def realizar_comparacao_automatica():
     return resultados_finais
 
 # ----------------------------------------------------------------------
-# CONFIGURAÇÃO E EXIBIÇÃO DO STREAMLIT (AJUSTADO PARA NOVO LAYOUT E MÚLTIPLOS LINKS)
+# CONFIGURAÇÃO E EXIBIÇÃO DO STREAMLIT (AJUSTADO PARA NOVO LAYOUT E ESTILO)
 # ----------------------------------------------------------------------
 st.set_page_config(page_title="Comparador de Preços", page_icon="🛒", layout="wide")
 
@@ -762,7 +771,7 @@ st.markdown("""
                 "image title"
                 "image shibata"
                 "image nagumo";
-            gap: 1px 10px; /* 1px gap linha, 10px gap coluna */
+            gap: 1px 10px; /* 2px gap linha, 10px gap coluna */
             min-height: 90px; 
             overflow: hidden; 
         }
@@ -780,34 +789,33 @@ st.markdown("""
             padding-bottom: 2px;
             line-height: 1.2; 
         }
-        .market-list {
-            padding: 0;
-            margin: 0;
-        }
-        .shibata-list { 
-            grid-area: shibata;
-        }
-        .nagumo-list { 
-            grid-area: nagumo;
-        }
         .market-link {
             text-decoration: none;
             display: block;
+            padding: 2px 0;
+            align-self: start; 
+            font-size: 0.9em; 
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            color: red; /* Cor padrão */
+            color: red; /* Cor padrão (se não for o melhor preço/preço de referência) */
         }
-        /* Cor do link após o clique */
+        /* *** NOVO: Mantém a cor do link após o clique (visited) *** */
         .market-link:visited {
             color: inherit; 
         }
+        .shibata-link { 
+            grid-area: shibata;
+        }
+        .nagumo-link { 
+            grid-area: nagumo;
+        }
         .logo-pequeno {
             vertical-align: middle; 
-            margin-right: 4px;
-            height: 16px; 
-            width: 16px; 
-            object-fit: cover;
+            margin-right: 5px;
+            height: 60px; 
+            width: 60px; 
+            object-fit: contain;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -815,6 +823,7 @@ st.markdown("""
 st.markdown(f"<h6>🛒 Comparação Automática de Preços (Lendo {JSON_FILE})</h6>", unsafe_allow_html=True)
 
 # Executa a comparação
+# O 'st.spinner' agora encapsula a execução paralela
 if 'resultados_comparacao' not in st.session_state:
     with st.spinner("🔍 Buscando e comparando preços em paralelo..."):
         st.session_state.resultados_comparacao = realizar_comparacao_automatica()
@@ -847,111 +856,92 @@ if resultados_comparacao:
 
     # Exibe os resultados na lista formatada
     for item in resultados_filtrados:
-        # Valores para comparação geral e coloração
+        # Valores para comparação
         shibata_val = item['shibata_preco_val']
         nagumo_val = item['nagumo_preco_val']
         preco_ref = item['preco_referencia_nome'] # Preço extraído do nome do JSON
         
-        # O melhor preço unitário geral (para negrito)
-        melhor_preco_geral = min(shibata_val, nagumo_val) 
+        # Disponibilidade
+        shibata_disponivel = shibata_val != float('inf') and shibata_val > 0
+        nagumo_disponivel = nagumo_val != float('inf') and nagumo_val > 0
+        
+        # Determina o melhor preço do mercado
+        if shibata_disponivel and nagumo_disponivel:
+            is_shibata_melhor = shibata_val <= nagumo_val
+        elif shibata_disponivel:
+            is_shibata_melhor = True
+        elif nagumo_disponivel:
+            is_shibata_melhor = False
+        else:
+            is_shibata_melhor = False # Ambos indisponíveis
 
-        # --- Generate Shibata Links (Loop over all products) ---
-        shibata_links_html = ""
-        for produto in item.get('shibata_produtos_detalhes', []):
-            preco_unit_val = produto['preco_unidade_val']
-            preco_unit_str = produto['preco_unidade_str']
-            source_url = produto['source_url']
+        
+        # --- Lógica de Estilo --- (Cor e Negrito)
+        
+        # 1. Cor (Prioridade: Verde se for menor ou igual ao preço de referência, senão Vermelho)
+        shibata_color = "red"
+        nagumo_color = "red"
+        
+        # Se o preço do mercado for menor ou igual ao preço de referência, usa verde (COM TOLERÂNCIA)
+        if preco_ref and shibata_disponivel and shibata_val <= preco_ref + TOLERANCE:
+            shibata_color = "green"
+        if preco_ref and nagumo_disponivel and nagumo_val <= preco_ref + TOLERANCE:
+            nagumo_color = "green"
             
-            is_available = preco_unit_val != float('inf') and preco_unit_val > 0
-            
-            # 1. Color (Green if <= Reference, Red otherwise)
-            color = "red"
-            if preco_ref and is_available and preco_unit_val <= preco_ref + TOLERANCE:
-                color = "green"
+        # 2. Negrito (Para o melhor preço entre os dois mercados)
+        shibata_weight = "bold" if is_shibata_melhor and shibata_disponivel else "normal"
+        nagumo_weight = "bold" if not is_shibata_melhor and nagumo_disponivel else "normal"
+        
+        # Style Final (Combinando cor e peso da fonte)
+        shibata_link_style = f"font-weight: {shibata_weight}; color: {shibata_color};"
+        nagumo_link_style = f"font-weight: {nagumo_weight}; color: {nagumo_color};"
+        
+        # Strings de preço para os links (Novo: Combina Preço Unitário + Preço Total)
+        
+        # Case 1: Shibata
+        shibata_unit_str = item['shibata_preco_str']
+        if shibata_disponivel and shibata_unit_str not in ["Preço indisponível", "N/D"]:
+            shibata_total_display = item['shibata_total_str']
+            shibata_preco_str_final = f"{shibata_unit_str} (R${shibata_total_display})"
+        else:
+            shibata_preco_str_final = "N/D"
 
-            # 2. Bold (If this price is the overall best among ALL links)
-            weight = "bold" if is_available and preco_unit_val <= melhor_preco_geral + TOLERANCE else "normal"
+        # Case 2: Nagumo
+        nagumo_unit_str = item['nagumo_preco_str']
+        if nagumo_disponivel and nagumo_unit_str not in ["Preço indisponível", "N/D"]:
+            nagumo_total_display = item['nagumo_total_str']
+            nagumo_preco_str_final = f"{nagumo_unit_str} (R${nagumo_total_display})"
+        else:
+            nagumo_preco_str_final = "N/D"
             
-            link_style = f"font-weight: {weight}; color: {color}; font-size: 0.9em;"
-            
-            # Total Price calculation and display string
-            preco_total_val = float(produto.get('preco') or produto.get('preco_oferta') or 0)
-            preco_total_display = f"{preco_total_val:.2f}".replace('.', ',') if preco_total_val > 0 else "N/D"
-
-            if is_available and preco_unit_str not in ["Preço indisponível", "N/D"]:
-                final_price_str = f"{preco_unit_str} (R${preco_total_display})"
-            else:
-                final_price_str = "N/D"
-                
-            shibata_links_html += f"""
-                <div style="line-height: 1.1;">
-                    <a href="{source_url}" target="_blank" class='market-link' style="{link_style}">
-                        <img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white; padding: 1px; border-radius: 4px; height: 16px; width: 16px; margin-right: 4px;" alt="Logo Shibata"/> {final_price_str}
-                    </a>
-                </div>
-            """
-        if not shibata_links_html:
-            shibata_links_html = f"<div style='line-height: 1.1; font-size: 0.9em;'><img src='{LOGO_SHIBATA_URL}' class='logo-pequeno' style='height: 16px; width: 16px; margin-right: 4px;'/> N/D (Produtos Indisponíveis)</div>"
-
-        # --- Generate Nagumo Links (Loop over all products) ---
-        nagumo_links_html = ""
-        for produto in item.get('nagumo_produtos_detalhes', []):
-            preco_unit_val = produto['preco_unitario_valor']
-            preco_unit_str = produto['preco_unitario_str']
-            source_url = produto['source_url']
-            
-            is_available = preco_unit_val != float('inf') and preco_unit_val > 0
-            
-            # 1. Color (Green if <= Reference, Red otherwise)
-            color = "red"
-            if preco_ref and is_available and preco_unit_val <= preco_ref + TOLERANCE:
-                color = "green"
-
-            # 2. Bold (If this price is the overall best among ALL links)
-            weight = "bold" if is_available and preco_unit_val <= melhor_preco_geral + TOLERANCE else "normal"
-            
-            link_style = f"font-weight: {weight}; color: {color}; font-size: 0.9em;"
-            
-            # Preço total para Nagumo (Price é o preço final, já considerando promoção)
-            preco_total_val = float(produto.get('price') or 0)
-            preco_total_display = f"{preco_total_val:.2f}".replace('.', ',') if preco_total_val > 0 else "N/D"
-
-            if is_available and preco_unit_str not in ["Preço indisponível", "N/D"]:
-                final_price_str = f"{preco_unit_str} (R${preco_total_display})"
-            else:
-                final_price_str = "N/D"
-
-            nagumo_links_html += f"""
-                <div style="line-height: 1.1;">
-                    <a href="{source_url}" target="_blank" class='market-link' style="{link_style}">
-                        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white; padding: 1px; border-radius: 4px; height: 16px; width: 16px; object-fit: cover; margin-right: 4px;" alt="Logo Nagumo"/> {final_price_str}
-                    </a>
-                </div>
-            """
-        if not nagumo_links_html:
-            nagumo_links_html = f"<div style='line-height: 1.1; font-size: 0.9em;'><img src='{LOGO_NAGUMO_URL}' class='logo-pequeno' style='height: 16px; width: 16px; margin-right: 4px;'/> N/D (Produtos Indisponíveis)</div>"
-            
-        # NOME ORIGINAL COMPLETO do JSON
+        # NOME ORIGINAL COMPLETO do JSON e o melhor preço
         nome_original = item['nome_original_completo']
+        preco_destaque = item['preco_principal_str']
         
         # URL da Imagem
         img_src = item.get('imagem_principal', DEFAULT_IMAGE_URL)
         if not img_src:
              img_src = DEFAULT_IMAGE_URL
 
-        # Bloco HTML principal (agora usando os blocos de lista)
+        # Bloco HTML
         st.markdown(f"""
 <div class='comparison-item'>
     <img src="{img_src}" class='product-image' alt="{nome_original}" />
     <div class='price-badge'>
     <span style="font-weight: bold; font-size: 1.15em; line-height: 1.2;">{nome_original}</span>
     </div>
-    <div class='market-list shibata-list'>
-        {shibata_links_html}
-    </div>
-    <div class='market-list nagumo-list'>
-        {nagumo_links_html}
-    </div>
+    <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
+<img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white;
+  padding: 2px 2px;       
+  border-radius: 6px;        
+  overflow: hidden;          
+  height: 22px;" alt="Logo Shibata"/> {shibata_preco_str_final}
+    </a>
+    <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
+        <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white; 
+  border-radius: 6px;                  
+  height: 24px;object-fit: cover;border: 1.5px solid white;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
+    </a>
 </div>
 """, unsafe_allow_html=True)
 

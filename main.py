@@ -749,7 +749,7 @@ if resultados_comparacao:
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white; 
   border-radius: 6px;                  
-  height: 25px;object-fit: cover;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
+  height: 24px;object-fit: cover;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
     </a>
 </div>
 """, unsafe_allow_html=True)

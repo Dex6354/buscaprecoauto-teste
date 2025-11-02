@@ -740,7 +740,7 @@ if resultados_comparacao:
     <img src="{img_src}" class='product-image' alt="{item['nome_exibicao']}" />
     </div>
     <div class='price-badge'>
-    <strong>{nome_exibicao}</strong><br>
+    <strong>{titulo_principal}</strong><br>
     </div>
     <div>
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">

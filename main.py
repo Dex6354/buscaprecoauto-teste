@@ -740,11 +740,11 @@ if resultados_comparacao:
     <span style="font-weight: bold; font-size: 1.15em; line-height: 1.2;">{nome_original}</span>
     </div>
     <a href="{item['shibata']}" target="_blank" class='market-link shibata-link' style="{shibata_link_style}">
-<img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white;display: inline-block;
-  padding: 1px 1px;       
+<img src="{LOGO_SHIBATA_URL}" class='logo-pequeno' style="background-color: white;
+  padding: 2px 2px;       
   border-radius: 6px;        
   overflow: hidden;          
-  height: 30px;" alt="Logo Shibata"/> Shibata: {shibata_preco_str_final}
+  height: 20px;" alt="Logo Shibata"/> Shibata: {shibata_preco_str_final}
     </a>
     <a href="{item['nagumo']}" target="_blank" class='market-link nagumo-link' style="{nagumo_link_style}">
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' alt="Logo Nagumo"/> Nagumo: {nagumo_preco_str_final}

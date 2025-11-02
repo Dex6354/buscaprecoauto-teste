@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # CONSTANTES GLOBAIS
 # ----------------------------------------------------------------------
 JSON_FILE = "itens.json" # Define o nome do arquivo JSON
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESpYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
     "Authorization": f"Bearer {TOKEN}",
@@ -471,6 +471,10 @@ def processar_item(item):
     # Extrai o preço de referência do nome do JSON
     preco_referencia_nome = extrair_preco_do_nome(nome_completo)
     
+    # Variáveis para armazenar o link do produto com o melhor preço unitário
+    melhor_shibata_link = ""
+    melhor_nagumo_link = ""
+    
     # ----------------------------------------------------------------------
     # 1. Busca e Processamento Shibata (POR ID) - AJUSTADO PARA LIDAR COM LISTA
     # ----------------------------------------------------------------------
@@ -560,12 +564,18 @@ def processar_item(item):
                 p['preco_unidade_val'] = preco_unidade_val
                 p['preco_unidade_str'] = preco_unidade_str 
                 p['imagem_url'] = shibata_imagem_url # Armazena a URL da imagem no produto
+                p['url_produto'] = shibata_url # *** CORREÇÃO: Armazena o link original no produto
                 
                 # --- Fim da lógica de cálculo ---
                 
                 produtos_shibata_processados.append(p)
+    
     # Ordena todos os produtos encontrados para pegar o melhor preço
     produtos_shibata_ordenados = sorted(produtos_shibata_processados, key=lambda x: x['preco_unidade_val'])
+    
+    # *** CORREÇÃO: Armazena o link do produto com o melhor preço unitário ***
+    if produtos_shibata_ordenados:
+        melhor_shibata_link = produtos_shibata_ordenados[0].get('url_produto', '')
 
     # ----------------------------------------------------------------------
     # 2. Busca e Processamento Nagumo (POR SKU) - AJUSTADO PARA LIDAR COM LISTA
@@ -607,10 +617,15 @@ def processar_item(item):
 
                 produto['preco_unitario_str'] = calcular_preco_unitario_nagumo(preco_exibir, produto.get('description', ''), produto['name'], produto.get("unit"))
                 produto['preco_unitario_valor'] = extrair_valor_unitario(produto['preco_unitario_str'])
+                produto['url_produto'] = nagumo_url # *** CORREÇÃO: Armazena o link original no produto
                 
                 produtos_nagumo_processados.append(produto)
 
     produtos_nagumo_ordenados = sorted(produtos_nagumo_processados, key=lambda x: x['preco_unitario_valor'])
+    
+    # *** CORREÇÃO: Armazena o link do produto com o melhor preço unitário ***
+    if produtos_nagumo_ordenados:
+        melhor_nagumo_link = produtos_nagumo_ordenados[0].get('url_produto', '')
 
     # ----------------------------------------------------------------------
     # 3. Formata os Resultados Finais
@@ -656,9 +671,10 @@ def processar_item(item):
         "nome_exibicao": nome_exibicao,
         "preco_principal_str": preco_principal_str,
         "imagem_principal": imagem_principal,
-        # Guarda as URLs como string para exibição/links
-        "nagumo": str(item.get('nagumo', '')), 
-        "shibata": str(item.get('shibata', '')), 
+        # *** CORREÇÃO APLICADA AQUI: Usa a URL do melhor produto encontrado/processado ***
+        "nagumo": melhor_nagumo_link, 
+        "shibata": melhor_shibata_link, 
+        # ********************************************************************************
         "shibata_preco_val": preco_shibata_val,
         "nagumo_preco_val": preco_nagumo_val,
         "shibata_preco_str": preco_shibata_str, 

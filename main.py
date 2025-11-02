@@ -807,22 +807,13 @@ st.markdown("""
         footer {visibility: hidden;}
         #MainMenu {visibility: hidden;}
         
-        /* NOVO: Container principal que envolve todos os itens */
-        .main-comparison-box {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 0; /* Remove o padding, pois os itens já têm o seu */
-            margin-bottom: 20px;
-            background-color: #f9f9f9; /* Fundo leve para o box */
-        }
-
+        /* *** AJUSTE PRINCIPAL AQUI: Borda apenas na parte inferior *** */
         .comparison-item {
-            border: none; /* Removido a borda do item individual */
-            /* *** AJUSTE CRÍTICO: Borda mais grossa para visibilidade e cor vermelha *** */
-            border-bottom: 2px solid red; 
-            background-color: white; /* Garante que a linha vermelha apareça sobre o fundo branco */
+            border: none; /* Remove todas as bordas */
+            border-bottom: 1px solid #ddd; /* Adiciona apenas a borda inferior */
+            border-radius: 0; /* Remove o border-radius */
             padding: 10px;
-            margin-bottom: 0; /* Removido o margin-bottom */
+            margin-bottom: 0px; /* Reduz a margem inferior para a borda ficar mais coesa */
             display: grid; /* Usa grid */
             grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
             grid-template-rows: auto auto auto; /* 3 linhas */
@@ -834,12 +825,8 @@ st.markdown("""
             min-height: 90px; 
             overflow: hidden; 
         }
+        /* *************************************************************** */
         
-        /* Garante que o último item não tenha a linha vermelha */
-        .comparison-item:last-child {
-            border-bottom: none; 
-        }
-
         .product-image {
             grid-area: image;
             width: 80px;
@@ -911,17 +898,13 @@ if resultados_comparacao:
     else:
         resultados_filtrados = resultados_comparacao
 
-    # O Streamlit já coloca uma linha abaixo do header h5
-    st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True) 
+    st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True)
     
     if not resultados_filtrados:
         st.info("Nenhum item encontrado com o filtro aplicado.")
         
     # Tolerância para evitar erros de ponto flutuante na comparação de igualdade/menor ou igual.
     TOLERANCE = 0.001
-    
-    # *** NOVO: Abre o container principal (o único quadrado) ***
-    st.markdown("<div class='main-comparison-box'>", unsafe_allow_html=True)
 
     # Exibe os resultados na lista formatada
     for item in resultados_filtrados:
@@ -1014,9 +997,6 @@ if resultados_comparacao:
     </a>
 </div>
 """, unsafe_allow_html=True)
-    
-    # *** NOVO: Fecha o container principal ***
-    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<h5>Saída JSON (Estrutura Completa)</h5>", unsafe_allow_html=True)
     st.json(resultados_comparacao)

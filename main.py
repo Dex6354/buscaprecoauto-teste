@@ -890,35 +890,65 @@ resultados_comparacao = st.session_state.resultados_comparacao
 if resultados_comparacao:
     
     # ----------------------------------------------------------------------
-    # *** SEÇÃO DE FILTRO DE TEXTO SIMPLES E INSTANTÂNEO ***
-    # ----------------------------------------------------------------------
-    termo_pesquisa = st.text_input("", placeholder="🔎 Digite o nome do produto...", label_visibility="collapsed")
-    
-    resultados_filtrados = []
-    if termo_pesquisa:
-        termo_pesquisa_limpo = remover_acentos(termo_pesquisa)
-        for item in resultados_comparacao:
-            # Usa o nome original, limpo de acentos, para a pesquisa
-            nome_limpo = remover_acentos(item['nome_original_completo'])
-            
-            # Condição para incluir o item na lista filtrada (oculta o que não contiver o texto)
-            if termo_pesquisa_limpo in nome_limpo:
-                resultados_filtrados.append(item)
-    else:
-        # Se não houver texto, exibe todos os resultados
-        resultados_filtrados = resultados_comparacao
-    # ----------------------------------------------------------------------
-    
-    if not resultados_filtrados:
-        st.info("Nenhum item encontrado com o filtro aplicado.")
+    # *** SEÇÃO DE FILTRO DE TEXTO SIMPLES E INSTANTÂNEO (AGORA EM JAVASCRIPT) ***
+    # O filtro em Python e o st.text_input foram removidos para evitar o re-execução do Streamlit. 
+    # O filtro agora é implementado em JavaScript (client-side) usando onkeyup.
+    st.markdown("""
+<input type="text" id="search-input" placeholder="🔎 Digite o nome do produto..." onkeyup="filterList()" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px;">
+<script>
+    // Função para remover acentos (adaptada do Python)
+    function removeAccents(str) {
+        if (!str) return "";
+        // Usa normalize e regex para remover diacríticos e acentos
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function filterList() {
+        const input = document.getElementById('search-input');
+        // Limpa o texto de pesquisa (lowercase, sem acentos, sem espaços extras)
+        const filterText = removeAccents(input.value.toLowerCase().trim());
         
+        // Encontra todos os contêineres de itens
+        const items = document.querySelectorAll('.comparison-item');
+        let firstVisibleItemFound = false;
+
+        items.forEach(item => {
+            // O nome original do item está dentro de 'price-badge' > span.
+            const nameElement = item.querySelector('.price-badge span');
+            if (!nameElement) return;
+            
+            // Limpa o nome do item
+            const nameText = removeAccents(nameElement.textContent.toLowerCase());
+            
+            if (nameText.includes(filterText)) {
+                item.style.display = 'grid'; // Exibe o item
+                
+                // Lógica para aplicar a borda superior apenas no primeiro item VÍSIVEL
+                if (!firstVisibleItemFound) {
+                    item.classList.add('first-comparison-item');
+                    firstVisibleItemFound = true;
+                } else {
+                    item.classList.remove('first-comparison-item');
+                }
+            } else {
+                item.style.display = 'none'; // Oculta o item
+                item.classList.remove('first-comparison-item'); // Remove a classe se estiver oculto
+            }
+        });
+    }
+</script>
+    """, unsafe_allow_html=True)
+    # ----------------------------------------------------------------------
+    
     # Tolerância para evitar erros de ponto flutuante na comparação de igualdade/menor ou igual.
     TOLERANCE = 0.001
 
-    # Exibe os resultados na lista formatada (iterando sobre a lista FILTRADA)
-    for index, item in enumerate(resultados_filtrados): # *** ADICIONADO ENUMERATE ***
+    # Exibe os resultados na lista formatada (agora itera sobre a lista COMPLETA)
+    # A visibilidade é controlada pelo JavaScript.
+    for index, item in enumerate(resultados_comparacao): 
         
-        # Lógica para adicionar a classe apenas ao primeiro item
+        # A classe 'first-comparison-item' é adicionada ao primeiro elemento (index 0) 
+        # por padrão, mas a função JS acima a ajustará dinamicamente após o filtro.
         extra_class = ""
         if index == 0:
             extra_class = " first-comparison-item"

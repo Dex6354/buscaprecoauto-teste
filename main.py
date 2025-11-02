@@ -807,11 +807,20 @@ st.markdown("""
         footer {visibility: hidden;}
         #MainMenu {visibility: hidden;}
         
-        .comparison-item {
+        /* NOVO: Container principal que envolve todos os itens */
+        .main-comparison-box {
             border: 1px solid #ddd;
             border-radius: 8px;
+            padding: 0; /* Remove o padding, pois os itens já têm o seu */
+            margin-bottom: 20px;
+            background-color: #f9f9f9; /* Fundo leve para o box */
+        }
+
+        .comparison-item {
+            border: none; /* Removido a borda do item individual */
+            border-bottom: 1px solid white; /* NOVO: Linha divisória branca */
             padding: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 0; /* Removido o margin-bottom */
             display: grid; /* Usa grid */
             grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
             grid-template-rows: auto auto auto; /* 3 linhas */
@@ -823,6 +832,12 @@ st.markdown("""
             min-height: 90px; 
             overflow: hidden; 
         }
+        
+        /* Garante que o último item não tenha a linha branca */
+        .comparison-item:last-child {
+            border-bottom: none; 
+        }
+
         .product-image {
             grid-area: image;
             width: 80px;
@@ -901,6 +916,9 @@ if resultados_comparacao:
         
     # Tolerância para evitar erros de ponto flutuante na comparação de igualdade/menor ou igual.
     TOLERANCE = 0.001
+    
+    # *** NOVO: Abre o container principal (o único quadrado) ***
+    st.markdown("<div class='main-comparison-box'>", unsafe_allow_html=True)
 
     # Exibe os resultados na lista formatada
     for item in resultados_filtrados:
@@ -993,6 +1011,9 @@ if resultados_comparacao:
     </a>
 </div>
 """, unsafe_allow_html=True)
+    
+    # *** NOVO: Fecha o container principal ***
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<h5>Saída JSON (Estrutura Completa)</h5>", unsafe_allow_html=True)
     st.json(resultados_comparacao)

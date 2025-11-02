@@ -689,14 +689,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown(f"<h6>🛒 Comparação Automática de Preços (Lendo {JSON_FILE})</h6>", unsafe_allow_html=True)
-st.markdown("Itens carregados e comparados por ID/SKU.")
 
 # Executa a comparação
 with st.spinner("🔍 Buscando e comparando preços..."):
     resultados_comparacao = realizar_comparacao_automatica()
 
 if resultados_comparacao:
-    st.markdown("<h5>Resultados Comparativos (Preços Unitários Mais Baixos)</h5>", unsafe_allow_html=True)
+    st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True)
 
     # Exibe os resultados na lista formatada
     for item in resultados_comparacao:

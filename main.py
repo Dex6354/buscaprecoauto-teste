@@ -3,13 +3,13 @@ import requests
 import unicodedata
 import re
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed # Importação importante
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ----------------------------------------------------------------------
 # CONSTANTES GLOBAIS
 # ----------------------------------------------------------------------
 JSON_FILE = "itens.json" # Define o nome do arquivo JSON
-TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
     "Authorization": f"Bearer {TOKEN}",
@@ -57,7 +57,7 @@ def extrair_termos_busca(nome_completo):
     
     return nome_busca, nome_sem_preco # nome_busca, nome_exibicao
 
-# *** EXTRAI O VALOR DE PREÇO DO NOME DO ITEM NO JSON ***
+# *** NOVA FUNÇÃO: EXTRAI O VALOR DE PREÇO DO NOME DO ITEM NO JSON ***
 def extrair_preco_do_nome(nome_completo):
     """Extrai o primeiro preço (R$X,XX ou R$X.XX) do nome completo e retorna como float."""
     match = re.search(r'R\$(\s*\d+(?:[.,]\d+)?)', nome_completo, flags=re.IGNORECASE)
@@ -69,11 +69,11 @@ def extrair_preco_do_nome(nome_completo):
         except ValueError:
             return None
     return None
-
 # ----------------------------------------------------------------------
 # FUNÇÕES DE CÁLCULO DE PREÇO UNITÁRIO
 # ----------------------------------------------------------------------
 
+# Funções utilitárias (mantidas)
 def remover_acentos(texto):
     if not texto:
         return ""
@@ -289,6 +289,7 @@ def extrair_valor_unitario(preco_unitario):
 def buscar_detalhes_shibata(produto_id):
     """
     Busca os detalhes de um produto específico no Shibata pelo ID.
+    Esta função resolve o erro 'OrganizationId' enviando os HEADERS corretos.
     """
     url = f"https://services.vipcommerce.com.br/api-admin/v1/org/{ORG_ID}/filial/1/centro_distribuicao/1/loja/produtos/{produto_id}/detalhes"
     try:
@@ -296,16 +297,19 @@ def buscar_detalhes_shibata(produto_id):
         if response.status_code == 200:
             return response.json().get('data', {}).get('produto')
         else:
-            # Não usa st.warning/error aqui para evitar problemas de thread
+            # st.warning(f"Shibata API (detalhes) falhou para ID {produto_id}. Status: {response.status_code}") # Removido para não poluir logs em threads
             return None
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        # st.error(f"Erro de conexão ao buscar detalhes do Shibata (ID: {produto_id}): {e}") # Removido para não poluir logs em threads
         return None
-    except Exception:
+    except Exception as e:
+        # st.error(f"Erro inesperado ao buscar detalhes do Shibata (ID: {produto_id}): {e}") # Removido para não poluir logs em threads
         return None
 
 def buscar_detalhes_nagumo_por_sku(sku):
     """
     Busca os detalhes de um produto específico no Nagumo pelo SKU.
+    (CORRIGIDO) Utiliza a 'SearchProducts' buscando o SKU como termo de busca.
     """
     url = "https://nextgentheadless.instaleap.io/api/v3"
     headers = {
@@ -324,9 +328,9 @@ def buscar_detalhes_nagumo_por_sku(sku):
                 "storeReference": "22",
                 "currentPage": 1,
                 "minScore": 1,
-                "pageSize": 5, 
-                "search": [{"query": sku}], 
-                "filters": {}, 
+                "pageSize": 5, # Busca 5 por segurança
+                "search": [{"query": sku}], # *** CORREÇÃO: Busca o SKU como termo
+                "filters": {}, # *** CORREÇÃO: Remove o filtro que não funcionava
                 "googleAnalyticsSessionId": ""
             }
         },
@@ -360,22 +364,27 @@ def buscar_detalhes_nagumo_por_sku(sku):
         produtos = data.get("data", {}).get("searchProducts", {}).get("products", [])
         
         if not produtos:
+            # st.warning(f"Nagumo API (SKU search) não encontrou o item: {sku}") # Removido para não poluir logs em threads
             return None
 
-        # Itera nos resultados para achar o SKU exato
+        # *** CORREÇÃO: Itera nos resultados para achar o SKU exato
         for produto in produtos:
             if produto.get('sku') == sku:
-                return produto 
+                return produto # Retorna o produto exato
         
+        # Se saiu do loop, não encontrou o SKU exato
+        # st.warning(f"Nagumo API (SKU search) encontrou {len(produtos)} itens para '{sku}', mas NENHUM correspondeu ao SKU exato.") # Removido para não poluir logs em threads
         return None
 
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        # st.error(f"Erro de conexão ao buscar detalhes do Nagumo (SKU: {sku}): {e}") # Removido para não poluir logs em threads
         return None
-    except Exception:
+    except Exception as e:
+        # st.error(f"Erro inesperado ao buscar detalhes do Nagumo (SKU: {sku}): {e}") # Removido para não poluir logs em threads
         return None
 
 # ----------------------------------------------------------------------
-# FUNÇÕES DE PROCESSAMENTO PARA OBTENÇÃO DO MELHOR PREÇO UNITÁRIO
+# FUNÇÕES DE PROCESSAMENTO PARA OBTENÇÃO DO MELHOR PREÇO UNITÁRIO (AJUSTADAS)
 # ----------------------------------------------------------------------
 
 def obter_melhor_preco_shibata(produtos_ordenados):
@@ -384,6 +393,7 @@ def obter_melhor_preco_shibata(produtos_ordenados):
     e o preço total do Shibata.
     """
     if not produtos_ordenados:
+        # Retorna float('inf') para valor unitário e total, e string de indisponível
         return float('inf'), "Preço indisponível", float('inf') 
 
     melhor_produto = produtos_ordenados[0]
@@ -392,27 +402,33 @@ def obter_melhor_preco_shibata(produtos_ordenados):
     if preco_total == 0:
         return float('inf'), "Preço indisponível", float('inf')
     
-    preco_unidade_str = f"R$ {preco_total:.2f}/un".replace('.', ',') 
-    preco_unidade_val = preco_total 
+    # Prioriza o preco_unidade_val calculado por nós
+    preco_unidade_str = f"R$ {preco_total:.2f}/un".replace('.', ',') # Default fallback string
+    preco_unidade_val = preco_total # Default fallback value
     
     if 'preco_unidade_val' in melhor_produto and melhor_produto['preco_unidade_val'] != float('inf') and melhor_produto['preco_unidade_val'] > 0:
         preco_unidade_val = melhor_produto['preco_unidade_val']
         preco_unidade_str = melhor_produto.get('preco_unidade_str', 'R$ 0,00/un')
         
+        # Tenta extrair a unidade e o formato da string
         match = re.search(r"/([a-zA-Z]+)", preco_unidade_str)
         unidade = match.group(1).lower() if match else "un"
         
+        # Formatação especial para kg e L (2 casas)
         if unidade in ['kg', 'l', 'un']:
             preco_unidade_str = f"R$ {preco_unidade_val:.2f}/{unidade}".replace('.', ',')
+        # Formatação especial para metro/folha (papel) (3 casas)
         elif unidade in ['m', 'folha']:
             preco_unidade_str = f"R$ {preco_unidade_val:.3f}/{unidade}".replace('.', ',')
         else:
             preco_unidade_str = preco_unidade_str.replace('.', ',')
         
+        # Retorna unit_price_val, unit_price_str, total_price_val
         return preco_unidade_val, preco_unidade_str, preco_total 
     
+    # Fallback se o cálculo falhar
     unidade_sigla = melhor_produto.get('unidade_sigla') or 'un'
-    return preco_total, f"R$ {preco_total:.2f}/{unidade_sigla.lower()}".replace('.', ','), preco_total
+    return preco_total, f"R$ {preco_total:.2f}/{unidade_sigla.lower()}".replace('.', ','), preco_total # Retorna preco_total como valor unitário e total
 
 def obter_melhor_preco_nagumo(produtos_ordenados):
     """
@@ -436,29 +452,32 @@ def obter_melhor_preco_nagumo(produtos_ordenados):
     if preco_total == 0:
          return float('inf'), "Preço indisponível", float('inf') 
          
+    # Se não conseguimos calcular o unitário, usamos o total como unitário (e total)
     return preco_total, f"R$ {preco_total:.2f}/un".replace('.', ','), preco_total
 
 # ----------------------------------------------------------------------
-# FUNÇÃO DE PROCESSAMENTO DE ITEM (CORE LÓGICA)
+# FUNÇÕES DE PROCESSAMENTO INDIVIDUAL (PARA PARALELISMO)
 # ----------------------------------------------------------------------
+
 def processar_item(item):
-    """Processa a busca de preços para um único item em paralelo."""
-    
-    # 1. Extração de informações do JSON
+    """
+    Processa um único item do JSON, realizando as buscas no Shibata e Nagumo.
+    """
+    # Extrai o nome de exibição do JSON
     nome_completo = item['nome']
     _, nome_exibicao = extrair_termos_busca(nome_completo)
+    
+    # Extrai o preço de referência do nome do JSON
     preco_referencia_nome = extrair_preco_do_nome(nome_completo)
     
-    shibata_url = item['shibata']
-    nagumo_url = item['nagumo']
-    
+    # ----------------------------------------------------------------------
+    # 1. Busca e Processamento Shibata (POR ID)
+    # ----------------------------------------------------------------------
     produtos_shibata_processados = []
-    shibata_imagem_url = None
-    
-    # ----------------------------------------------------------------------
-    # 2. Busca e Processamento Shibata (POR ID)
-    # ----------------------------------------------------------------------
+    shibata_url = item['shibata']
     match_shibata_id = re.search(r'/produto/(\d+)', shibata_url)
+    
+    shibata_imagem_url = None
     
     if match_shibata_id:
         produto_id = match_shibata_id.group(1)
@@ -469,9 +488,12 @@ def processar_item(item):
             em_oferta = p.get('em_oferta', False)
             preco_oferta = p.get('preco_oferta')
             
+            # *** NOVA LÓGICA DE IMAGEM SHIBATA ***
+            # O campo correto é 'imagem'
             imagem_nome = p.get('imagem')
             if imagem_nome:
                 shibata_imagem_url = f"{SHIBATA_IMAGE_BASE_URL}{imagem_nome}"
+            # ***********************************
             
             if not preco_oferta:
                 oferta_info = p.get('oferta') or {}
@@ -486,6 +508,7 @@ def processar_item(item):
             
             preco_unidade_str = formatar_preco_unidade_personalizado(preco_total, quantidade_dif, unidade_sigla)
             
+            # --- Lógica de cálculo de preço unitário ---
             descricao_limpa = descricao.lower().replace('grande', '').strip()
             
             preco_unidade_val, preco_un_str_papel = calcular_precos_papel(descricao, preco_total)
@@ -508,6 +531,7 @@ def processar_item(item):
                         preco_unidade_val = preco_total / quantidade
                 except: pass
             
+            # Cálculo de papel toalha/higiênico (para unidade de folha/metro)
             if contem_papel_toalha(f"{p.get('nome', '')} {descricao}"):
                 total_folhas, preco_por_folha = calcular_preco_papel_toalha(f"{p.get('nome', '')} {descricao}", preco_total)
                 if preco_por_folha:
@@ -519,25 +543,32 @@ def processar_item(item):
                  preco_unidade_val = preco_por_metro_val 
                  preco_unidade_str = preco_por_metro_str.replace('.', ',')
             
+            # Se ainda for float('inf') ou None, usa o preço total como unitário (fallback)
             if not preco_unidade_val or preco_unidade_val == float('inf') or preco_unidade_val == 0: 
                  preco_unidade_val = preco_total
             
             p['preco_unidade_val'] = preco_unidade_val
             p['preco_unidade_str'] = preco_unidade_str 
-            p['imagem_url'] = shibata_imagem_url
+            p['imagem_url'] = shibata_imagem_url # Armazena a URL da imagem no produto
+            
+            # --- Fim da lógica de cálculo ---
             
             produtos_shibata_processados.append(p)
+    # else: # Removido para não poluir logs em threads
+    #      st.warning(f"Não foi possível extrair ID do Shibata da URL: {shibata_url}.")
 
     produtos_shibata_ordenados = sorted(produtos_shibata_processados, key=lambda x: x['preco_unidade_val'])
 
     # ----------------------------------------------------------------------
-    # 3. Busca e Processamento Nagumo (POR SKU)
+    # 2. Busca e Processamento Nagumo (POR SKU)
     # ----------------------------------------------------------------------
     produtos_nagumo_processados = []
-    nagumo_imagem_url = None
+    nagumo_url = item['nagumo']
     
     sku_match_list = re.findall(r'(\d+)', nagumo_url.split('?')[0])
     sku = sku_match_list[-1] if sku_match_list else None
+    
+    nagumo_imagem_url = None
     
     if sku and sku.isdigit():
         produto = buscar_detalhes_nagumo_por_sku(sku)
@@ -551,89 +582,139 @@ def processar_item(item):
                 preco_desconto = cond[0].get("price")
             preco_exibir = preco_desconto if preco_desconto else preco_normal
             
+            # *** LÓGICA DE IMAGEM NAGUMO ***
             photos = produto.get('photosUrl')
             if photos and isinstance(photos, list) and len(photos) > 0:
                 nagumo_imagem_url = photos[0]
+            # ******************************
 
             produto['preco_unitario_str'] = calcular_preco_unitario_nagumo(preco_exibir, produto.get('description', ''), produto['name'], produto.get("unit"))
             produto['preco_unitario_valor'] = extrair_valor_unitario(produto['preco_unitario_str'])
             
             produtos_nagumo_processados.append(produto)
+    # else: # Removido para não poluir logs em threads
+    #     st.warning(f"Não foi possível extrair SKU do Nagumo da URL: {nagumo_url}")
 
     produtos_nagumo_ordenados = sorted(produtos_nagumo_processados, key=lambda x: x['preco_unitario_valor'])
 
     # ----------------------------------------------------------------------
-    # 4. Formata os Resultados Finais
+    # 3. Formata os Resultados Finais
     # ----------------------------------------------------------------------
+    
     preco_shibata_val, preco_shibata_str, shibata_total_val = obter_melhor_preco_shibata(produtos_shibata_ordenados)
     preco_nagumo_val, preco_nagumo_str, nagumo_total_val = obter_melhor_preco_nagumo(produtos_nagumo_ordenados)
 
+    # Determina o preço mais baixo e a imagem principal
+    preco_principal_str = "N/D"
     imagem_principal = DEFAULT_IMAGE_URL
+
+    is_shibata_melhor = preco_shibata_val <= preco_nagumo_val and preco_shibata_val != float('inf')
+    is_nagumo_melhor = preco_nagumo_val < preco_shibata_val and preco_nagumo_val != float('inf')
+    
+    # *** LÓGICA DE PRIORIDADE DE IMAGEM ***
     if produtos_shibata_ordenados and produtos_shibata_ordenados[0].get('imagem_url'):
         imagem_principal = produtos_shibata_ordenados[0]['imagem_url']
     elif nagumo_imagem_url:
         imagem_principal = nagumo_imagem_url
+    # **********************************************
 
+    if is_shibata_melhor:
+        preco_principal_str = preco_shibata_str
+        
+    elif is_nagumo_melhor:
+        preco_principal_str = preco_nagumo_str
+        
+    else:
+        # Fallback (Nenhum preço é válido ou estão empatados e indisponíveis)
+        if preco_shibata_str != "Preço indisponível":
+            preco_principal_str = preco_shibata_str
+        elif preco_nagumo_str != "Preço indisponível":
+            preco_principal_str = preco_nagumo_str
+
+    # *** NOVO: Formata a string do preço total ***
     shibata_total_str = f"{shibata_total_val:.2f}".replace('.', ',') if shibata_total_val != float('inf') and shibata_total_val > 0 else "N/D"
     nagumo_total_str = f"{nagumo_total_val:.2f}".replace('.', ',') if nagumo_total_val != float('inf') and nagumo_total_val > 0 else "N/D"
     
-    # Retorna o dicionário de resultado para o item
-    return {
-        "nome_original_completo": nome_completo,
+    # Monta o objeto final
+    resultado = {
+        "nome_original_completo": item['nome'], # <-- NOME COMPLETO DO JSON
         "nome_exibicao": nome_exibicao,
+        "preco_principal_str": preco_principal_str,
         "imagem_principal": imagem_principal,
-        "nagumo": nagumo_url, 
-        "shibata": shibata_url, 
+        "nagumo": item['nagumo'], 
+        "shibata": item['shibata'], 
         "shibata_preco_val": preco_shibata_val,
         "nagumo_preco_val": preco_nagumo_val,
         "shibata_preco_str": preco_shibata_str, 
         "nagumo_preco_str": preco_nagumo_str,
+        # *** NOVO: Adiciona a referência de preço do JSON
         "preco_referencia_nome": preco_referencia_nome,
+        # *** NOVO: Adiciona os preços totais
         "shibata_total_val": shibata_total_val,
         "nagumo_total_val": nagumo_total_val,
         "shibata_total_str": shibata_total_str,
         "nagumo_total_str": nagumo_total_str,
     }
-
+    
+    return resultado
 
 # ----------------------------------------------------------------------
-# LÓGICA PRINCIPAL DE COMPARAÇÃO (AJUSTADA PARA PARALELISMO)
+# LÓGICA PRINCIPAL DE COMPARAÇÃO (COM PARALELISMO)
 # ----------------------------------------------------------------------
-@st.cache_data(show_spinner=False)
+
 def realizar_comparacao_automatica():
     """
-    Executa a busca em paralelo para a lista de itens lida do JSON e 
-    retorna os resultados formatados.
+    Executa a busca para a lista de itens lida do JSON e retorna os resultados formatados.
+    Utiliza ThreadPoolExecutor para paralelizar as requisições de API.
     """
     lista_itens = ler_itens_json()
     if not lista_itens:
         return []
 
     resultados_finais = []
-    MAX_WORKERS = 10 # Define o número máximo de threads (ajustável)
     
-    # Inicia a execução em paralelo
+    # Define o número máximo de threads (ajustável, 10 é um bom ponto de partida)
+    MAX_WORKERS = 10 
+
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # Mapeia a função processar_item para todos os itens da lista
-        futures = [executor.submit(processar_item, item) for item in lista_itens]
+        # Mapeia a função processar_item para cada item da lista
+        future_to_item = {executor.submit(processar_item, item): item for item in lista_itens}
         
         # Coleta os resultados assim que estiverem prontos
-        for future in as_completed(futures):
+        for future in as_completed(future_to_item):
             try:
-                result = future.result()
-                if result:
-                    resultados_finais.append(result)
-            except Exception as e:
-                # Loga erros de processamento para itens individuais, mas continua
-                st.error(f"Erro ao processar um item: {e}") 
+                resultado = future.result()
+                resultados_finais.append(resultado)
+            except Exception as exc:
+                # Captura e loga erros que ocorreram na thread
+                st.error(f'Um item gerou uma exceção: {exc}')
 
-    # Classifica os resultados finais pelo menor preço unitário
-    resultados_finais.sort(key=lambda x: min(x.get('shibata_preco_val', float('inf')), x.get('nagumo_preco_val', float('inf'))))
+    # --- Lógica de Ordenação AJUSTADA ---
+    # Prioridade 1: O menor preço unitário do item é menor que o preço de referência (COR VERDE)
+    # Prioridade 2: Ordenação crescente pelo menor preço unitário.
+    
+    def chave_ordenacao(item):
+        shibata_val = item['shibata_preco_val']
+        nagumo_val = item['nagumo_preco_val']
+        preco_ref = item['preco_referencia_nome']
+        
+        melhor_preco_atual = min(shibata_val, nagumo_val)
+        
+        # 1. Indicador de "Preço Verde" (Prioridade 1)
+        # Retorna 0 (primeiro) se o melhor preço atual for menor que o preço de referência.
+        # Retorna 1 (depois) caso contrário.
+        is_green = 0 if preco_ref and melhor_preco_atual < preco_ref and melhor_preco_atual != float('inf') else 1
+        
+        # 2. Valor do Melhor Preço (Prioridade 2)
+        # Ordena crescentemente.
+        return (is_green, melhor_preco_atual)
+
+    resultados_finais.sort(key=chave_ordenacao)
     
     return resultados_finais
 
 # ----------------------------------------------------------------------
-# CONFIGURAÇÃO E EXIBIÇÃO DO STREAMLIT (SEM ALTERAÇÕES)
+# CONFIGURAÇÃO E EXIBIÇÃO DO STREAMLIT (AJUSTADO PARA NOVO LAYOUT E ESTILO)
 # ----------------------------------------------------------------------
 st.set_page_config(page_title="Comparador de Preços", page_icon="🛒", layout="wide")
 
@@ -648,14 +729,14 @@ st.markdown("""
             border-radius: 8px;
             padding: 10px;
             margin-bottom: 10px;
-            display: grid; 
-            grid-template-columns: 80px 1fr; 
-            grid-template-rows: auto auto auto; 
+            display: grid; /* Usa grid */
+            grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
+            grid-template-rows: auto auto auto; /* 3 linhas */
             grid-template-areas:
                 "image title"
                 "image shibata"
                 "image nagumo";
-            gap: 1px 10px; 
+            gap: 1px 10px; /* 2px gap linha, 10px gap coluna */
             min-height: 90px; 
             overflow: hidden; 
         }
@@ -682,10 +763,10 @@ st.markdown("""
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            color: red; 
+            color: red; /* Cor padrão (se não for o melhor preço/preço de referência) */
         }
+        /* *** NOVO: Mantém a cor do link após o clique (visited) *** */
         .market-link:visited {
-            /* Mantém a cor do link após o clique */
             color: inherit; 
         }
         .shibata-link { 
@@ -706,10 +787,10 @@ st.markdown("""
 
 st.markdown(f"<h6>🛒 Comparação Automática de Preços (Lendo {JSON_FILE})</h6>", unsafe_allow_html=True)
 
-# Executa a comparação (agora em paralelo)
+# Executa a comparação
+# O 'st.spinner' agora encapsula a execução paralela
 with st.spinner("🔍 Buscando e comparando preços em paralelo..."):
-    # Adicionado o decorator @st.cache_data para evitar re-execução desnecessária
-    resultados_comparacao = realizar_comparacao_automatica() 
+    resultados_comparacao = realizar_comparacao_automatica()
 
 if resultados_comparacao:
     st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True)
@@ -719,7 +800,7 @@ if resultados_comparacao:
         # Valores para comparação
         shibata_val = item['shibata_preco_val']
         nagumo_val = item['nagumo_preco_val']
-        preco_ref = item['preco_referencia_nome']
+        preco_ref = item['preco_referencia_nome'] # Preço extraído do nome do JSON
         
         # Disponibilidade
         shibata_disponivel = shibata_val != float('inf') and shibata_val > 0
@@ -733,7 +814,7 @@ if resultados_comparacao:
         elif nagumo_disponivel:
             is_shibata_melhor = False
         else:
-            is_shibata_melhor = False
+            is_shibata_melhor = False # Ambos indisponíveis
 
         
         # --- Lógica de Estilo --- (Cor e Negrito)
@@ -742,6 +823,7 @@ if resultados_comparacao:
         shibata_color = "red"
         nagumo_color = "red"
         
+        # Se o preço do mercado for menor que o preço de referência, usa verde
         if preco_ref and shibata_disponivel and shibata_val < preco_ref:
             shibata_color = "green"
         if preco_ref and nagumo_disponivel and nagumo_val < preco_ref:
@@ -755,7 +837,9 @@ if resultados_comparacao:
         shibata_link_style = f"font-weight: {shibata_weight}; color: {shibata_color};"
         nagumo_link_style = f"font-weight: {nagumo_weight}; color: {nagumo_color};"
         
-        # Strings de preço para os links (Unitário + Total)
+        # Strings de preço para os links (Novo: Combina Preço Unitário + Preço Total)
+        
+        # Case 1: Shibata
         shibata_unit_str = item['shibata_preco_str']
         if shibata_disponivel and shibata_unit_str not in ["Preço indisponível", "N/D"]:
             shibata_total_display = item['shibata_total_str']
@@ -763,6 +847,7 @@ if resultados_comparacao:
         else:
             shibata_preco_str_final = "N/D"
 
+        # Case 2: Nagumo
         nagumo_unit_str = item['nagumo_preco_str']
         if nagumo_disponivel and nagumo_unit_str not in ["Preço indisponível", "N/D"]:
             nagumo_total_display = item['nagumo_total_str']
@@ -770,7 +855,9 @@ if resultados_comparacao:
         else:
             nagumo_preco_str_final = "N/D"
             
+        # NOME ORIGINAL COMPLETO do JSON e o melhor preço
         nome_original = item['nome_original_completo']
+        preco_destaque = item['preco_principal_str']
         
         # URL da Imagem
         img_src = item.get('imagem_principal', DEFAULT_IMAGE_URL)

@@ -818,7 +818,9 @@ st.markdown("""
 
         .comparison-item {
             border: none; /* Removido a borda do item individual */
-            border-bottom: 10px solid red; /* AJUSTADO: Linha divisória vermelha */
+            /* *** AJUSTE CRÍTICO: Borda mais grossa para visibilidade e cor vermelha *** */
+            border-bottom: 2px solid red; 
+            background-color: white; /* Garante que a linha vermelha apareça sobre o fundo branco */
             padding: 10px;
             margin-bottom: 0; /* Removido o margin-bottom */
             display: grid; /* Usa grid */
@@ -909,7 +911,8 @@ if resultados_comparacao:
     else:
         resultados_filtrados = resultados_comparacao
 
-    st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True)
+    # O Streamlit já coloca uma linha abaixo do header h5
+    st.markdown("<h5>Busca Automática de Preços</h5>", unsafe_allow_html=True) 
     
     if not resultados_filtrados:
         st.info("Nenhum item encontrado com o filtro aplicado.")

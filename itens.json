@@ -68,14 +68,25 @@
     ]
   },
   {
-    "nome": "🍚 Arroz Camil R$18,50",
-    "nagumo": [],
-    "shibata": []
+    "nome": "🍚 Arroz Camil R$16,50",
+    "nagumo": [
+      "https://www.nagumo.com/p/293303",
+      "https://www.nagumo.com/p/122238"
+    ],
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/12542/arroz-branco-camil-tipo-1-pacote-5kg",
+      "https://www.loja.shibata.com.br/produto/14786/arroz-agulhinha-tipo-1-camil-pacote-1kg",
+      "https://www.loja.shibata.com.br/produto/9269/arroz-agulhinha-camil-tipo-1-pacote-2kg"
+    ]
   },
   {
     "nome": "🫒 Azeitona 150g R$6,90",
     "nagumo": [],
-    "shibata": []
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/7977/azeitona-verde-em-conserva-fatiada-rivoli-sache-peso-liquido-300g-peso-drenado-150g",
+      "https://www.loja.shibata.com.br/produto/9001/azeitona-verde-em-conserva-fatiada-vale-fertil-sache-peso-liquido-230g-peso-drenado-120g",
+      "https://www.loja.shibata.com.br/produto/12948/azeitona-verde-em-conserva-fatiada-rivoli-vidro-peso-liquido-335g-peso-drenado-160g"
+    ]
   },
   {
     "nome": "🍌 Banana R$4,00",
@@ -89,9 +100,13 @@
     ]
   },
   {
-    "nome": "🥔 Batata R$2,99",
-    "nagumo": [],
-    "shibata": []
+    "nome": "🥔 Batata R$2",
+    "nagumo": [
+      "https://www.nagumo.com/p/7511"
+    ],
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/16469/batata-lavada-1-unidade"
+    ]
   },
   {
     "nome": "🍟 Batata frita Uni 1kg R$14,90",

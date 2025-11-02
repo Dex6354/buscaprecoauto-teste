@@ -880,7 +880,6 @@ st.markdown("""
 st.markdown(f"<h6>🛒 Busca Preço Automático</h6>", unsafe_allow_html=True)
 
 # Executa a comparação
-# O 'st.spinner' agora encapsula a execução paralela
 if 'resultados_comparacao' not in st.session_state:
     with st.spinner("🔍 Buscando e comparando preços em paralelo..."):
         st.session_state.resultados_comparacao = realizar_comparacao_automatica()
@@ -890,13 +889,11 @@ resultados_comparacao = st.session_state.resultados_comparacao
 if resultados_comparacao:
     
     # ----------------------------------------------------------------------
-    # *** SEÇÃO DE FILTRO DE TEXTO SIMPLES E INSTANTÂNEO (AGORA EM JAVASCRIPT) ***
-    # O filtro em Python e o st.text_input foram removidos para evitar o re-execução do Streamlit. 
-    # O filtro agora é implementado em JavaScript (client-side) usando onkeyup.
+    # *** SEÇÃO DE FILTRO DE TEXTO SIMPLES E INSTANTÂNEO (JAVASCRIPT CORRIGIDO) ***
     st.markdown("""
 <input type="text" id="search-input" placeholder="🔎 Digite o nome do produto..." onkeyup="filterList()" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px;">
 <script>
-    // Função para remover acentos (adaptada do Python)
+    // Função para remover acentos
     function removeAccents(str) {
         if (!str) return "";
         // Usa normalize e regex para remover diacríticos e acentos
@@ -913,14 +910,18 @@ if resultados_comparacao:
         let firstVisibleItemFound = false;
 
         items.forEach(item => {
-            // O nome original do item está dentro de 'price-badge' > span.
             const nameElement = item.querySelector('.price-badge span');
-            if (!nameElement) return;
+            if (!nameElement) {
+                // Se o elemento do nome não for encontrado, oculta por segurança
+                item.style.display = 'none'; 
+                return;
+            }
             
-            // Limpa o nome do item
-            const nameText = removeAccents(nameElement.textContent.toLowerCase());
+            // CORREÇÃO: Adicionado .trim() no nome do item para remover espaços em branco invisíveis.
+            const nameText = removeAccents(nameElement.textContent.toLowerCase().trim());
             
-            if (nameText.includes(filterText)) {
+            // Se o filtro for vazio OU o nome incluir o filtro
+            if (filterText === "" || nameText.includes(filterText)) {
                 item.style.display = 'grid'; // Exibe o item
                 
                 // Lógica para aplicar a borda superior apenas no primeiro item VÍSIVEL
@@ -932,7 +933,7 @@ if resultados_comparacao:
                 }
             } else {
                 item.style.display = 'none'; // Oculta o item
-                item.classList.remove('first-comparison-item'); // Remove a classe se estiver oculto
+                item.classList.remove('first-comparison-item'); // Garante que a classe de borda seja removida
             }
         });
     }
@@ -943,12 +944,9 @@ if resultados_comparacao:
     # Tolerância para evitar erros de ponto flutuante na comparação de igualdade/menor ou igual.
     TOLERANCE = 0.001
 
-    # Exibe os resultados na lista formatada (agora itera sobre a lista COMPLETA)
-    # A visibilidade é controlada pelo JavaScript.
+    # Exibe os resultados na lista formatada
     for index, item in enumerate(resultados_comparacao): 
         
-        # A classe 'first-comparison-item' é adicionada ao primeiro elemento (index 0) 
-        # por padrão, mas a função JS acima a ajustará dinamicamente após o filtro.
         extra_class = ""
         if index == 0:
             extra_class = " first-comparison-item"

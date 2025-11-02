@@ -750,7 +750,7 @@ if resultados_comparacao:
         <img src="{LOGO_NAGUMO_URL}" class='logo-pequeno' style="background-color: white; 
   border-radius: 6px;        
   overflow: hidden;          
-  height: 22px;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
+  height: 20px;" alt="Logo Nagumo"/> {nagumo_preco_str_final}
     </a>
 </div>
 """, unsafe_allow_html=True)

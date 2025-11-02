@@ -6,9 +6,9 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ----------------------------------------------------------------------
-# CONSTANTES GLOBAIS
+# CONSTANTES GLOBAIS (MANTIDAS)
 # ----------------------------------------------------------------------
-JSON_FILE = "itens.json" # Define o nome do arquivo JSON
+JSON_FILE = "itens.json" 
 TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJ2aXBjb21tZXJjZSIsImF1ZCI6ImFwaS1hZG1pbiIsInN1YiI6IjZiYzQ4NjdlLWRjYTktMTFlOS04NzQyLTAyMGQ3OTM1OWNhMCIsInZpcGNvbW1lcmNlQ2xpZW50ZUlkIjpudWxsLCJpYXQiOjE3NTE5MjQ5MjgsInZlciI6MSwiY2xpZW50IjpudWxsLCJvcGVyYXRvciI6bnVsbCwib3JnIjoiMTYxIn0.yDCjqkeJv7D3wJ0T_fu3AaKlX9s5PQYXD19cESWpH-j3F_Is-Zb-bDdUvduwoI_RkOeqbYCuxN0ppQQXb1ArVg"
 ORG_ID = "161"
 HEADERS_SHIBATA = {
@@ -28,7 +28,7 @@ SHIBATA_IMAGE_BASE_URL = "https://produto-assets-vipcommerce-com-br.br-se1.magal
 
 
 # ----------------------------------------------------------------------
-# FUNÇÕES DE LEITURA E EXTRAÇÃO DO JSON
+# FUNÇÕES DE UTILIDADE E DE BUSCA (MANTIDAS)
 # ----------------------------------------------------------------------
 
 def ler_itens_json():
@@ -69,11 +69,7 @@ def extrair_preco_do_nome(nome_completo):
         except ValueError:
             return None
     return None
-# ----------------------------------------------------------------------
-# FUNÇÕES DE CÁLCULO DE PREÇO UNITÁRIO
-# ----------------------------------------------------------------------
 
-# Funções utilitárias (mantidas)
 def remover_acentos(texto):
     if not texto:
         return ""
@@ -104,7 +100,7 @@ def calcular_preco_unidade(descricao, preco_total):
     match_g = re.search(r'(\d+(?:[\.,]\d+)?)\s*(g|gramas?)', desc_minus)
     if match_g:
         peso = float(match_g.group(1).replace(',', '.')) / 1000
-        if peso > 0: return preco_total / peso, f"R$ {preco_total / peso:.2f}".replace('.', ',') + "/kg"
+        if peso > 0: return preco_total / peso, f"R$ {preco_total / peso:.2f}/kg"
     match_l = re.search(r'(\d+(?:[\.,]\d+)?)\s*(l|litros?)', desc_minus)
     if match_l:
         litros = float(match_l.group(1).replace(',', '.'))
@@ -230,7 +226,7 @@ def calcular_preco_unitario_nagumo(preco_valor, descricao, nome, unidade_api=Non
                 metros = float(match_metros.group(1).replace(',', '.'))
                 if rolos > 0 and metros > 0:
                     preco_por_metro = preco_valor / rolos / metros
-                    return f"R$ {preco_por_metro:.3f}/m"
+                    return f"R$ {preco_valor / rolos / metros:.3f}/m"
             except:
                 pass
                 
@@ -282,11 +278,6 @@ def extrair_valor_unitario(preco_unitario):
         return float(match.group(1).replace(',', '.'))
     return float('inf')
 
-
-# ----------------------------------------------------------------------
-# FUNÇÕES DE BUSCA POR ID / SKU
-# ----------------------------------------------------------------------
-
 def buscar_detalhes_shibata(produto_id):
     """
     Busca os detalhes de um produto específico no Shibata pelo ID.
@@ -298,13 +289,10 @@ def buscar_detalhes_shibata(produto_id):
         if response.status_code == 200:
             return response.json().get('data', {}).get('produto')
         else:
-            # st.warning(f"Shibata API (detalhes) falhou para ID {produto_id}. Status: {response.status_code}") # Removido para não poluir logs em threads
             return None
     except requests.exceptions.RequestException as e:
-        # st.error(f"Erro de conexão ao buscar detalhes do Shibata (ID: {produto_id}): {e}") # Removido para não poluir logs em threads
         return None
     except Exception as e:
-        # st.error(f"Erro inesperado ao buscar detalhes do Shibata (ID: {produto_id}): {e}") # Removido para não poluir logs em threads
         return None
 
 def buscar_detalhes_nagumo_por_sku(sku):
@@ -365,7 +353,6 @@ def buscar_detalhes_nagumo_por_sku(sku):
         produtos = data.get("data", {}).get("searchProducts", {}).get("products", [])
         
         if not produtos:
-            # st.warning(f"Nagumo API (SKU search) não encontrou o item: {sku}") # Removido para não poluir logs em threads
             return None
 
         # *** CORREÇÃO: Itera nos resultados para achar o SKU exato
@@ -374,19 +361,12 @@ def buscar_detalhes_nagumo_por_sku(sku):
                 return produto # Retorna o produto exato
         
         # Se saiu do loop, não encontrou o SKU exato
-        # st.warning(f"Nagumo API (SKU search) encontrou {len(produtos)} itens para '{sku}', mas NENHUM correspondeu ao SKU exato.") # Removido para não poluir logs em threads
         return None
 
     except requests.exceptions.RequestException as e:
-        # st.error(f"Erro de conexão ao buscar detalhes do Nagumo (SKU: {sku}): {e}") # Removido para não poluir logs em threads
         return None
     except Exception as e:
-        # st.error(f"Erro inesperado ao buscar detalhes do Nagumo (SKU: {sku}): {e}") # Removido para não poluir logs em threads
         return None
-
-# ----------------------------------------------------------------------
-# FUNÇÕES DE PROCESSAMENTO PARA OBTENÇÃO DO MELHOR PREÇO UNITÁRIO (AJUSTADAS)
-# ----------------------------------------------------------------------
 
 def obter_melhor_preco_shibata(produtos_ordenados):
     """
@@ -455,10 +435,6 @@ def obter_melhor_preco_nagumo(produtos_ordenados):
          
     # Se não conseguimos calcular o unitário, usamos o total como unitário (e total)
     return preco_total, f"R$ {preco_total:.2f}/un".replace('.', ','), preco_total
-
-# ----------------------------------------------------------------------
-# FUNÇÕES DE PROCESSAMENTO INDIVIDUAL (PARA PARALELISMO)
-# ----------------------------------------------------------------------
 
 def processar_item(item):
     """
@@ -656,10 +632,8 @@ def processar_item(item):
     is_shibata_melhor = preco_shibata_val <= preco_nagumo_val and preco_shibata_val != float('inf')
     is_nagumo_melhor = preco_nagumo_val < preco_shibata_val and preco_nagumo_val != float('inf')
     
-    # *********************************************************************************
     # LÓGICA DE PRIORIDADE DE IMAGEM CORRIGIDA E CONSOLIDADA: 
     # Prioriza a imagem do produto que tem o melhor preço unitário geral.
-    # *********************************************************************************
     
     # 1. Shibata é o melhor ou único disponível
     if is_shibata_melhor:
@@ -722,10 +696,6 @@ def processar_item(item):
     
     return resultado
 
-# ----------------------------------------------------------------------
-# LÓGICA PRINCIPAL DE COMPARAÇÃO (COM PARALELISMO)
-# ----------------------------------------------------------------------
-
 def realizar_comparacao_automatica():
     """
     Executa a busca para a lista de itens lida do JSON e retorna os resultados formatados.
@@ -750,9 +720,7 @@ def realizar_comparacao_automatica():
                 resultado = future.result()
                 resultados_finais.append(resultado)
             except Exception as exc:
-                # Captura e loga erros que ocorreram na thread
-                # st.error(f'Um item gerou uma exceção: {exc}') # Removido para evitar poluição no Streamlit
-                pass # Garante que o bloco 'except' não está vazio, evitando IndentationError na linha seguinte
+                pass 
                 
     # --- Lógica de Ordenação AJUSTADA para priorizar Ordem Alfabética DENTRO de cada grupo ---
     
@@ -805,24 +773,24 @@ st.markdown("""
     <style>
         .block-container { padding-top: 0rem; }
         footer {visibility: hidden;}
-        #MainMenu {visibility: hidden;} /* Oculta o menu de 3 pontos */
-        header {visibility: hidden;}    /* Oculta o cabeçalho principal (Deploy, Github, Editar) */
+        #MainMenu {visibility: hidden;} 
+        header {visibility: hidden;}    
         
         /* *** AJUSTE PRINCIPAL AQUI: Borda apenas na parte inferior *** */
         .comparison-item {
-            border: none; /* Remove todas as bordas */
-            border-bottom: 1px solid #ddd; /* Adiciona apenas a borda inferior */
-            border-radius: 0; /* Remove o border-radius */
+            border: none; 
+            border-bottom: 1px solid #ddd; 
+            border-radius: 0; 
             padding: 10px;
-            margin-bottom: 0px; /* Reduz a margem inferior para a borda ficar mais coesa */
-            display: grid; /* Usa grid */
-            grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
-            grid-template-rows: auto auto auto; /* 3 linhas */
+            margin-bottom: 0px; 
+            display: grid; 
+            grid-template-columns: 80px 1fr; 
+            grid-template-rows: auto auto auto; 
             grid-template-areas:
                 "image title"
                 "image shibata"
                 "image nagumo";
-            gap: 1px 10px; /* 2px gap linha, 10px gap coluna */
+            gap: 1px 10px; 
             min-height: 90px; 
             overflow: hidden; 
         }
@@ -855,7 +823,7 @@ st.markdown("""
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            color: red; /* Cor padrão (se não for o melhor preço/preço de referência) */
+            color: red; 
         }
         /* *** NOVO: Mantém a cor do link após o clique (visited) *** */
         .market-link:visited {
@@ -883,7 +851,7 @@ st.markdown(f"<h6>🛒 Busca Preço Automático</h6>", unsafe_allow_html=True)
 # LÓGICA PRINCIPAL DE STREAMLIT (AJUSTADA PARA CACHE DE RESULTADOS)
 # ----------------------------------------------------------------------
 
-# Executa a comparação APENAS SE AINDA NÃO FOI FEITA (evitando re-fetch no filtro)
+# Executa a comparação APENAS SE AINDA NÃO FOI FEITA (processo lento)
 if 'resultados_comparacao' not in st.session_state:
     with st.spinner("🔍 Buscando e comparando preços em paralelo..."):
         # Realiza a busca e a comparação (processo lento)
@@ -893,7 +861,7 @@ resultados_comparacao = st.session_state.resultados_comparacao
 
 if resultados_comparacao:
     
-    # Adicionar o campo de pesquisa (filtro) - AGORA É APENAS UM FILTRO LOCAL
+    # Adicionar o campo de pesquisa (filtro) - NÃO ESPERA ENTER E DISPARA RERUN IMEDIATAMENTE
     termo_pesquisa = st.text_input("", placeholder="🔎 Digite o nome do produto para filtrar...", label_visibility="collapsed")
     
     resultados_filtrados = []
@@ -917,11 +885,10 @@ if resultados_comparacao:
     # Exibe os resultados na lista formatada
     for index, item in enumerate(resultados_filtrados): # *** ADICIONADO ENUMERATE ***
         
-        # *** LÓGICA PARA ADICIONAR A CLASSE APENAS AO PRIMEIRO ITEM ***
+        # LÓGICA PARA ADICIONAR A CLASSE APENAS AO PRIMEIRO ITEM
         extra_class = ""
         if index == 0:
             extra_class = " first-comparison-item"
-        # **************************************************************
 
         # Valores para comparação
         shibata_val = item['shibata_preco_val']
@@ -991,7 +958,6 @@ if resultados_comparacao:
              img_src = DEFAULT_IMAGE_URL
 
         # Bloco HTML
-        # item['shibata'] e item['nagumo'] AGORA contêm a URL do produto com o MELHOR PREÇO.
         st.markdown(f"""
 <div class='comparison-item{extra_class}'>
     <img src="{img_src}" class='product-image' alt="{nome_original}" />

@@ -634,8 +634,8 @@ st.markdown("""
         .comparison-item {
             border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 5px;
+            margin-bottom: 5px;
             display: grid; /* Usa grid */
             grid-template-columns: 80px 1fr; /* 80px para imagem, resto para info */
             grid-template-rows: auto auto auto; /* 3 linhas */
@@ -680,11 +680,10 @@ st.markdown("""
         }
         .logo-pequeno {
             vertical-align: middle; 
-            margin-right: 1px;
+            margin-right: 5px;
             height: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
             width: 60px; /* CORREÇÃO: Tamanho dos logos unificado */
             object-fit: contain;
-            border-radius: 6px;
         }
     </style>
 """, unsafe_allow_html=True)

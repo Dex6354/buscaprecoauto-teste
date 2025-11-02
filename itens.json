@@ -53,8 +53,19 @@
   },
   {
     "nome": "🧼 Amaciante 1l R$17,27",
-    "nagumo": [],
-    "shibata": []
+    "nagumo": [
+      "https://www.nagumo.com/p/263942",
+      "https://www.nagumo.com/p/819008",
+      "https://www.nagumo.com/p/262693",
+      "https://www.nagumo.com/p/510608"
+    ],
+    "shibata": [
+      "https://www.loja.shibata.com.br/produto/7355/amaciante-de-roupa-concentrado-brisa-de-verao-downy-frasco-500ml",
+      "https://www.loja.shibata.com.br/produto/46252/refil-de-amaciante-de-roupa-concentrado-brisa-de-verao-downy-sache-750ml",
+      "https://www.loja.shibata.com.br/produto/6238/amaciante-de-roupa-concentrado-lirios-do-campo-downy-frasco-15l",
+      "https://www.loja.shibata.com.br/produto/17960/amaciante-de-roupa-concentrado-brisa-de-verao-downy-frasco-500ml-gratis-50ml",
+      "https://www.loja.shibata.com.br/produto/10350/amaciante-de-roupa-concentrado-brisa-de-verao-downy-frasco-1l"
+    ]
   },
   {
     "nome": "🍚 Arroz Camil R$18,50",

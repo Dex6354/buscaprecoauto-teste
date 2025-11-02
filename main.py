@@ -877,7 +877,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown(f"<h6>🛒 Comparação Automática de Preços</h6>", unsafe_allow_html=True)
+st.markdown(f"<h6>🛒 Busca Preço Automático</h6>", unsafe_allow_html=True)
 
 # Executa a comparação
 # O 'st.spinner' agora encapsula a execução paralela
